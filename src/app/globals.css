@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-bebas: 'Bebas Neue', sans-serif;
+  }
+  
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: #030712;
+    color: #f5f0eb;
+    font-family: var(--font-sans, sans-serif);
+  }
+
+  ::selection {
+    background: #ff440044;
+    color: #ff8800;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0d0d0d;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #ff4400;
+  }
+}
+
+@layer utilities {
+  .font-bebas {
+    font-family: var(--font-bebas), 'Bebas Neue', sans-serif;
+  }
+  
+  .font-mono {
+    font-family: var(--font-mono), 'Space Mono', monospace;
+  }
+
+  .text-fire {
+    background: linear-gradient(135deg, #ff4400, #ff8800, #ffcc00);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+@keyframes rise {
+  0%   { transform: translateY(0) scale(1); opacity: 0.8; }
+  50%  { opacity: 0.4; transform: translateY(-150px) scale(0.6); }
+  100% { transform: translateY(-300px) scale(0.1); opacity: 0; }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+.hover\:shadow-fire:hover {
+  box-shadow: 0 8px 30px #ff440055;
+}
