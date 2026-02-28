@@ -2,7 +2,7 @@
 
 > Permanently destroy unwanted tokens and NFTs across 8 chains. Non-custodial. Open source. Free.
 
-**Live site:** [cryptoburn.xyz](https://cryptoburn.xyz) *(deploy to Vercel)*
+**Live site:** [cryptoburn.xyz](https://cryptoburn.xyz) *(deploy to Vercel)* 
 
 ---
 
