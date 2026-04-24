@@ -1,6 +1,5 @@
 // lib/burnCNFT.ts
-// Burns compressed NFTs (cNFTs) using direct Bubblegum program instructions
-// Avoids UMI SDK which causes "undefined program id" errors in Next.js
+// Burns compressed NFTs using Bubblegum program with correct Helius DAS proof handling
 
 import {
   Connection,
@@ -11,20 +10,18 @@ import {
   LAMPORTS_PER_SOL,
   AccountMeta,
 } from '@solana/web3.js';
+import bs58 from 'bs58';
 import { FEE_RECIPIENT_SOLANA } from './fees';
 
 const HELIUS_API_KEY = '78198a01-1c06-4950-aa53-12920224316d';
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const SOL_RATE_USD = 150;
 
-// Bubblegum program ID
 const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY');
-// SPL Account Compression program
 const SPL_ACCOUNT_COMPRESSION_PROGRAM_ID = new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK');
-// Noop program
 const SPL_NOOP_PROGRAM_ID = new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV');
 
-// Bubblegum burn instruction discriminator
+// Bubblegum burn instruction discriminator (anchor 8-byte prefix for "burn")
 const BURN_DISCRIMINATOR = Buffer.from([116, 110, 29, 56, 107, 219, 42, 93]);
 
 export interface CNFTBurnResult {
@@ -34,58 +31,20 @@ export interface CNFTBurnResult {
   error?: string;
 }
 
-async function getAssetProof(mintAddress: string) {
-  const response = await fetch(HELIUS_RPC, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 'get-asset-proof',
-      method: 'getAssetProof',
-      params: { id: mintAddress },
-    }),
-  });
-  const data = await response.json();
-  return data?.result;
+function bufferToArray(buffer: Buffer): number[] {
+  const nums: number[] = [];
+  for (let i = 0; i < buffer.length; i++) {
+    nums.push(buffer[i]);
+  }
+  return nums;
 }
 
-async function getAsset(mintAddress: string) {
-  const response = await fetch(HELIUS_RPC, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 'get-asset',
-      method: 'getAsset',
-      params: { id: mintAddress },
-    }),
-  });
-  const data = await response.json();
-  return data?.result;
-}
-
-function decodeBase58(str: string): Uint8Array {
-  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  let bytes = [0];
-  for (const char of str) {
-    let carry = ALPHABET.indexOf(char);
-    if (carry < 0) throw new Error('Invalid base58 character');
-    for (let i = 0; i < bytes.length; i++) {
-      carry += bytes[i] * 58;
-      bytes[i] = carry & 0xff;
-      carry >>= 8;
-    }
-    while (carry > 0) {
-      bytes.push(carry & 0xff);
-      carry >>= 8;
-    }
-  }
-  // Add leading zeros
-  for (const char of str) {
-    if (char === '1') bytes.push(0);
-    else break;
-  }
-  return new Uint8Array(bytes.reverse());
+async function getBubblegumAuthorityPDA(treeAddress: PublicKey): Promise<PublicKey> {
+  const [authority] = PublicKey.findProgramAddressSync(
+    [treeAddress.toBytes()],
+    BUBBLEGUM_PROGRAM_ID
+  );
+  return authority;
 }
 
 export async function burnCompressedNFT(
@@ -114,74 +73,87 @@ export async function burnCompressedNFT(
       await connection.sendRawTransaction(signedFeeTx.serialize());
     }
 
-    // Step 2: Get asset and proof from Helius
-    const [asset, proof] = await Promise.all([
-      getAsset(mintAddress),
-      getAssetProof(mintAddress),
-    ]);
+    // Step 2: Get asset proof from Helius DAS
+    const proofResponse = await fetch(HELIUS_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'get-asset-proof',
+        method: 'getAssetProof',
+        params: { id: mintAddress },
+      }),
+    });
+    const proofData = await proofResponse.json();
+    const assetProof = proofData?.result;
+    if (!assetProof) return { success: false, error: 'Could not fetch asset proof' };
 
-    if (!asset || !proof) {
-      return { success: false, error: 'Could not fetch asset data from Helius' };
-    }
+    // Step 3: Get asset details from Helius DAS
+    const assetResponse = await fetch(HELIUS_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'get-asset',
+        method: 'getAsset',
+        params: { id: mintAddress },
+      }),
+    });
+    const assetData = await assetResponse.json();
+    const asset = assetData?.result;
+    if (!asset) return { success: false, error: 'Could not fetch asset details' };
 
-    const treeId = proof.tree_id;
-    const treeAuthority = PublicKey.findProgramAddressSync(
-      [new PublicKey(treeId).toBytes()],
-      BUBBLEGUM_PROGRAM_ID
-    )[0];
-
-    // Step 3: Build proof accounts
-    const proofAccounts: AccountMeta[] = (proof.proof || []).map((p: string) => ({
-      pubkey: new PublicKey(p),
+    // Step 4: Build proof path (remaining accounts)
+    const proofPath: AccountMeta[] = (assetProof.proof || []).map((node: string) => ({
+      pubkey: new PublicKey(node),
       isSigner: false,
       isWritable: false,
     }));
 
-    // Step 4: Encode burn instruction data
-    // burn(root, dataHash, creatorHash, nonce, index)
-    // proof.root comes as a base58 public key string from Helius
-    const rootBytes = new PublicKey(proof.root).toBytes();
+    // Step 5: Decode hashes using bs58 (same as Helius examples)
+    const rootArray = bufferToArray(Buffer.from(bs58.decode(assetProof.root)));
+    const dataHashArray = bufferToArray(Buffer.from(bs58.decode(asset.compression.data_hash.trim())));
+    const creatorHashArray = bufferToArray(Buffer.from(bs58.decode(asset.compression.creator_hash.trim())));
+    const leafNonce = asset.compression.leaf_id;
 
-    const dataHashBytes = asset.compression?.data_hash
-      ? new PublicKey(asset.compression.data_hash).toBytes()
-      : Buffer.alloc(32);
+    // Step 6: Get tree authority PDA
+    const treeAuthority = await getBubblegumAuthorityPDA(new PublicKey(assetProof.tree_id));
 
-    const creatorHashBytes = asset.compression?.creator_hash
-      ? new PublicKey(asset.compression.creator_hash).toBytes()
-      : Buffer.alloc(32);
+    // Step 7: Get leaf delegate (owner if no delegate)
+    const leafDelegate = asset.ownership.delegate
+      ? new PublicKey(asset.ownership.delegate)
+      : new PublicKey(asset.ownership.owner);
 
-    const nonce = BigInt(asset.compression?.leaf_id || 0);
-    const index = asset.compression?.leaf_id || 0;
-
-    // Pack instruction data
+    // Step 8: Build burn instruction data
+    // Layout: discriminator(8) + root(32) + dataHash(32) + creatorHash(32) + nonce(8) + index(4)
     const data = Buffer.alloc(8 + 32 + 32 + 32 + 8 + 4);
     let offset = 0;
     BURN_DISCRIMINATOR.copy(data, offset); offset += 8;
-    Buffer.from(rootBytes).copy(data, offset); offset += 32;
-    Buffer.from(dataHashBytes).copy(data, offset); offset += 32;
-    Buffer.from(creatorHashBytes).copy(data, offset); offset += 32;
-    data.writeBigUInt64LE(nonce, offset); offset += 8;
-    data.writeUInt32LE(index, offset);
+    Buffer.from(rootArray).copy(data, offset); offset += 32;
+    Buffer.from(dataHashArray).copy(data, offset); offset += 32;
+    Buffer.from(creatorHashArray).copy(data, offset); offset += 32;
+    data.writeBigUInt64LE(BigInt(leafNonce), offset); offset += 8;
+    data.writeUInt32LE(leafNonce, offset);
 
-    // Step 5: Build burn instruction
-    const burnInstruction = new TransactionInstruction({
+    // Step 9: Build burn instruction
+    const burnIx = new TransactionInstruction({
       programId: BUBBLEGUM_PROGRAM_ID,
       keys: [
         { pubkey: treeAuthority, isSigner: false, isWritable: false },
-        { pubkey: publicKey, isSigner: true, isWritable: false }, // leafOwner
-        { pubkey: publicKey, isSigner: true, isWritable: false }, // leafDelegate
-        { pubkey: new PublicKey(treeId), isSigner: false, isWritable: true },
+        { pubkey: new PublicKey(asset.ownership.owner), isSigner: true, isWritable: false },
+        { pubkey: leafDelegate, isSigner: false, isWritable: false },
+        { pubkey: new PublicKey(assetProof.tree_id), isSigner: false, isWritable: true },
         { pubkey: SPL_NOOP_PROGRAM_ID, isSigner: false, isWritable: false },
         { pubkey: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID, isSigner: false, isWritable: false },
-        ...proofAccounts,
+        ...proofPath,
       ],
       data,
     });
 
-    // Step 6: Send transaction
+    // Step 10: Send burn transaction
     const { blockhash } = await connection.getLatestBlockhash();
     const tx = new Transaction();
-    tx.add(burnInstruction);
+    tx.add(burnIx);
     tx.recentBlockhash = blockhash;
     tx.feePayer = publicKey;
 
