@@ -103,12 +103,6 @@ export async function burnCompressedNFT(
     const asset = assetData?.result;
     if (!asset) return { success: false, error: 'Could not fetch asset details' };
 
-    // Debug: log the actual data structure
-    console.log('Asset compression:', JSON.stringify(asset.compression));
-    console.log('Asset ownership:', JSON.stringify(asset.ownership));
-    console.log('Proof root:', assetProof.root);
-    console.log('Proof tree_id:', assetProof.tree_id);
-    console.log('Proof node_index:', assetProof.node_index);
 
     // Step 4: Build proof path (remaining accounts)
     const proofPath: AccountMeta[] = (assetProof.proof || []).map((node: string) => ({

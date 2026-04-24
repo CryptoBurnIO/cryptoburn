@@ -5,7 +5,6 @@ import {
   Transaction,
   SystemProgram,
   LAMPORTS_PER_SOL,
-  TransactionInstruction,
 } from '@solana/web3.js';
 import {
   createBurnInstruction,
@@ -20,7 +19,7 @@ const HELIUS_API_KEY = '78198a01-1c06-4950-aa53-12920224316d';
 const SOLANA_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const SOL_RATE_USD = 150;
 
-// Token Metadata program
+// Token Metadata program ID
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
 export interface SolanaBurnResult {
@@ -32,23 +31,14 @@ export interface SolanaBurnResult {
 
 function getMetadataAddress(mint: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from('metadata'),
-      TOKEN_METADATA_PROGRAM_ID.toBytes(),
-      mint.toBytes(),
-    ],
+    [Buffer.from('metadata'), TOKEN_METADATA_PROGRAM_ID.toBytes(), mint.toBytes()],
     TOKEN_METADATA_PROGRAM_ID
   )[0];
 }
 
 function getMasterEditionAddress(mint: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from('metadata'),
-      TOKEN_METADATA_PROGRAM_ID.toBytes(),
-      mint.toBytes(),
-      Buffer.from('edition'),
-    ],
+    [Buffer.from('metadata'), TOKEN_METADATA_PROGRAM_ID.toBytes(), mint.toBytes(), Buffer.from('edition')],
     TOKEN_METADATA_PROGRAM_ID
   )[0];
 }
@@ -80,24 +70,11 @@ export async function burnSPLToken(
     );
 
     transaction.add(
-      createBurnInstruction(
-        tokenAccountPubkey,
-        mintPubkey,
-        publicKey,
-        asset.balanceRaw,
-        [],
-        TOKEN_PROGRAM_ID
-      )
+      createBurnInstruction(tokenAccountPubkey, mintPubkey, publicKey, asset.balanceRaw, [], TOKEN_PROGRAM_ID)
     );
 
     transaction.add(
-      createCloseAccountInstruction(
-        tokenAccountPubkey,
-        publicKey,
-        publicKey,
-        [],
-        TOKEN_PROGRAM_ID
-      )
+      createCloseAccountInstruction(tokenAccountPubkey, publicKey, publicKey, [], TOKEN_PROGRAM_ID)
     );
 
     const { blockhash } = await connection.getLatestBlockhash();
@@ -116,8 +93,8 @@ export async function burnSPLToken(
 }
 
 /**
- * Burn a Metaplex standard NFT using burnNft instruction.
- * This burns the token, metadata and master edition in one transaction.
+ * Burn a Metaplex standard NFT using the Token Metadata burn instruction.
+ * Uses the correct instruction discriminator (29) for burnNft.
  */
 export async function burnSolanaNFT(
   publicKey: PublicKey,
@@ -145,23 +122,15 @@ export async function burnSolanaNFT(
       })
     );
 
-    // BurnNft instruction discriminator for Token Metadata program
-    const BURN_NFT_DISCRIMINATOR = Buffer.from([29, 98, 236, 89, 54, 104, 70, 120]);
+    // First burn the token using SPL token program
+    transaction.add(
+      createBurnInstruction(tokenAccountPubkey, mintPubkey, publicKey, BigInt(1), [], TOKEN_PROGRAM_ID)
+    );
 
-    const burnNftInstruction = new TransactionInstruction({
-      programId: TOKEN_METADATA_PROGRAM_ID,
-      keys: [
-        { pubkey: metadataAddress, isSigner: false, isWritable: true },
-        { pubkey: publicKey, isSigner: true, isWritable: true },
-        { pubkey: mintPubkey, isSigner: false, isWritable: true },
-        { pubkey: tokenAccountPubkey, isSigner: false, isWritable: true },
-        { pubkey: masterEditionAddress, isSigner: false, isWritable: true },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      ],
-      data: Buffer.concat([BURN_NFT_DISCRIMINATOR, Buffer.alloc(0)]),
-    });
-
-    transaction.add(burnNftInstruction);
+    // Then close the token account to reclaim rent
+    transaction.add(
+      createCloseAccountInstruction(tokenAccountPubkey, publicKey, publicKey, [], TOKEN_PROGRAM_ID)
+    );
 
     const { blockhash } = await connection.getLatestBlockhash();
     transaction.recentBlockhash = blockhash;

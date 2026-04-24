@@ -10,18 +10,13 @@ export function useSolanaAssets(publicKey: PublicKey | null) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!publicKey) {
-      setAssets([]);
-      return;
-    }
+    if (!publicKey) { setAssets([]); return; }
 
     async function fetchAssets() {
       setLoading(true);
       try {
         const walletAddress = publicKey!.toBase58();
         const found: Asset[] = [];
-
-        // --- Fetch ALL assets via Helius DAS API (handles standard + compressed NFTs + SPL tokens) ---
         let page = 1;
         let hasMore = true;
 
@@ -37,10 +32,7 @@ export function useSolanaAssets(publicKey: PublicKey | null) {
                 ownerAddress: walletAddress,
                 page,
                 limit: 100,
-                displayOptions: {
-                  showFungible: true,
-                  showNativeBalance: false,
-                },
+                displayOptions: { showFungible: true, showNativeBalance: false },
               },
             }),
           });
@@ -54,14 +46,26 @@ export function useSolanaAssets(publicKey: PublicKey | null) {
             const isFungible = asset.interface === 'FungibleToken' || asset.interface === 'FungibleAsset';
             const isNft = !isFungible;
             const isCompressed = asset.compression?.compressed === true;
+            
+            // Detect delegated cNFTs — these cannot be burned by the owner
+            const isDelegated = isCompressed && 
+              asset.ownership?.delegated === true &&
+              asset.ownership?.delegate &&
+              asset.ownership?.delegate !== walletAddress;
+
             const name = asset.content?.metadata?.name || (isNft ? `NFT (${mint.slice(0, 6)}...)` : `Token (${mint.slice(0, 6)}...)`);
             const symbol = asset.content?.metadata?.symbol || (isNft ? 'NFT' : 'SPL');
             const balance = isFungible ? (asset.token_info?.balance || 1) : 1;
             const decimals = isFungible ? (asset.token_info?.decimals || 0) : 0;
 
+            // Label delegated cNFTs clearly
+            let displayName = name;
+            if (isCompressed && !isDelegated) displayName = `${name} [cNFT]`;
+            if (isDelegated) displayName = `${name} [delegated — not burnable]`;
+
             found.push({
               id: `sol-${mint}`,
-              name: isCompressed ? `${name} [cNFT]` : name,
+              name: displayName,
               symbol,
               type: isNft ? 'nft' : 'token',
               balance: balance.toString(),
@@ -70,15 +74,13 @@ export function useSolanaAssets(publicKey: PublicKey | null) {
               contractAddress: mint,
               usdValue: '0',
               chain: 'solana',
-            });
+              // Store delegation status for filtering
+              notBurnable: isDelegated,
+            } as Asset & { notBurnable?: boolean });
           }
 
-          // Check if more pages
-          if (items.length < 100 || found.length >= total) {
-            hasMore = false;
-          } else {
-            page++;
-          }
+          if (items.length < 100 || found.length >= total) hasMore = false;
+          else page++;
         }
 
         setAssets(found);

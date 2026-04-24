@@ -20,7 +20,10 @@ export function SolanaInterface() {
   const [burnResults, setBurnResults] = useState<any[] | null>(null);
   const [burnedIds, setBurnedIds] = useState<Set<string>>(new Set());
 
-  const assets = rawAssets.filter((a) => !burnedIds.has(a.id));
+  // Filter out burned assets and split burnable vs delegated
+  const allAssets = rawAssets.filter((a) => !burnedIds.has(a.id));
+  const assets = allAssets.filter((a) => !(a as any).notBurnable);
+  const delegatedAssets = allAssets.filter((a) => (a as any).notBurnable);
   const selectedAssetObjects = assets.filter((a) => selectedAssets.has(a.id));
   const fee = calculateFee(selectedAssetObjects);
 
@@ -166,6 +169,16 @@ export function SolanaInterface() {
           )}
         </div>
       </div>
+
+      {/* Delegated cNFTs notice */}
+      {delegatedAssets.length > 0 && (
+        <div className="bg-gray-900/50 border border-yellow-900/40 rounded-sm p-3 mb-4">
+          <p className="font-mono text-xs text-yellow-600 mb-1">⚠️ {delegatedAssets.length} asset{delegatedAssets.length !== 1 ? 's' : ''} cannot be burned</p>
+          <p className="font-mono text-xs text-gray-600 leading-relaxed">
+            These cNFTs have a third-party delegate set by the creator — a common spam tactic that prevents the owner from burning them. This cannot be bypassed by any burn tool.
+          </p>
+        </div>
+      )}
 
       {selectedAssets.size > 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-sm p-4">
