@@ -88,6 +88,7 @@ export async function burnSPLToken(
     return { success: true, txHash, explorerUrl: `https://solscan.io/tx/${txHash}` };
   } catch (err: unknown) {
     const error = err as Error;
+    console.error('Solana SPL burn error:', error.message, error);
     return { success: false, error: error.message || 'Solana transaction failed' };
   }
 }
@@ -146,6 +147,7 @@ export async function burnSolanaNFT(
     return { success: true, txHash, explorerUrl: `https://solscan.io/tx/${txHash}` };
   } catch (err: unknown) {
     const error = err as Error;
+    console.error('Solana NFT burn error:', error.message, error);
     return { success: false, error: error.message || 'Solana NFT burn failed' };
   }
 }
