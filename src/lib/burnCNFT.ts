@@ -136,12 +136,16 @@ export async function burnCompressedNFT(
     data.writeUInt32LE(leafNonce, offset);
 
     // Step 9: Build burn instruction
+    // leafDelegate is a signer when it equals the owner (most common case)
+    const isDelegated = asset.ownership.delegate && 
+      asset.ownership.delegate !== asset.ownership.owner;
+    
     const burnIx = new TransactionInstruction({
       programId: BUBBLEGUM_PROGRAM_ID,
       keys: [
         { pubkey: treeAuthority, isSigner: false, isWritable: false },
         { pubkey: new PublicKey(asset.ownership.owner), isSigner: true, isWritable: false },
-        { pubkey: leafDelegate, isSigner: false, isWritable: false },
+        { pubkey: leafDelegate, isSigner: !isDelegated, isWritable: false },
         { pubkey: new PublicKey(assetProof.tree_id), isSigner: false, isWritable: true },
         { pubkey: SPL_NOOP_PROGRAM_ID, isSigner: false, isWritable: false },
         { pubkey: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID, isSigner: false, isWritable: false },
