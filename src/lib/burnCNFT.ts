@@ -139,9 +139,8 @@ export async function burnCompressedNFT(
 
     // Step 4: Encode burn instruction data
     // burn(root, dataHash, creatorHash, nonce, index)
-    const rootBytes = Buffer.from(proof.root, 'base58').length > 0
-      ? new PublicKey(proof.root).toBytes()
-      : Buffer.from(proof.root, 'base64');
+    // proof.root comes as a base58 public key string from Helius
+    const rootBytes = new PublicKey(proof.root).toBytes();
 
     const dataHashBytes = asset.compression?.data_hash
       ? new PublicKey(asset.compression.data_hash).toBytes()
