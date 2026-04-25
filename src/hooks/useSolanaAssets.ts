@@ -53,15 +53,21 @@ export function useSolanaAssets(publicKey: PublicKey | null) {
               asset.ownership?.delegate &&
               asset.ownership?.delegate !== walletAddress;
 
+            // Detect frozen token accounts — cannot be burned
+            const isFrozen = asset.ownership?.frozen === true;
+            
+            const isNotBurnable = isDelegated || isFrozen;
+
             const name = asset.content?.metadata?.name || (isNft ? `NFT (${mint.slice(0, 6)}...)` : `Token (${mint.slice(0, 6)}...)`);
             const symbol = asset.content?.metadata?.symbol || (isNft ? 'NFT' : 'SPL');
             const balance = isFungible ? (asset.token_info?.balance || 1) : 1;
             const decimals = isFungible ? (asset.token_info?.decimals || 0) : 0;
 
-            // Label delegated cNFTs clearly
+            // Label non-burnable assets clearly
             let displayName = name;
-            if (isCompressed && !isDelegated) displayName = `${name} [cNFT]`;
+            if (isCompressed && !isNotBurnable) displayName = `${name} [cNFT]`;
             if (isDelegated) displayName = `${name} [delegated — not burnable]`;
+            if (isFrozen) displayName = `${name} [frozen — not burnable]`;
 
             found.push({
               id: `sol-${mint}`,
@@ -75,7 +81,7 @@ export function useSolanaAssets(publicKey: PublicKey | null) {
               usdValue: '0',
               chain: 'solana',
               // Store delegation status for filtering
-              notBurnable: isDelegated,
+              notBurnable: isNotBurnable,
             } as Asset & { notBurnable?: boolean });
           }
 

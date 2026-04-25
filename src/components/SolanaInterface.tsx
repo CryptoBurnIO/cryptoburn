@@ -175,7 +175,7 @@ export function SolanaInterface() {
         <div className="bg-gray-900/50 border border-yellow-900/40 rounded-sm p-3 mb-4">
           <p className="font-mono text-xs text-yellow-600 mb-1">⚠️ {delegatedAssets.length} asset{delegatedAssets.length !== 1 ? 's' : ''} cannot be burned</p>
           <p className="font-mono text-xs text-gray-600 leading-relaxed">
-            These cNFTs have a third-party delegate set by the creator — a common spam tactic that prevents the owner from burning them. This cannot be bypassed by any burn tool.
+            These assets are either frozen or have a third-party delegate set by the creator — common spam tactics that prevent burning. This cannot be bypassed by any burn tool.
           </p>
         </div>
       )}
