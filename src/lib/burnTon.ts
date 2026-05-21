@@ -4,8 +4,9 @@
 import { toNano, Address, beginCell } from '@ton/ton';
 import { FEE_RECIPIENT_TON } from './fees';
 
-// TON burn address (zero address)
+// TON burn address (zero address) - must be in friendly bounceable format
 const TON_BURN_ADDRESS = 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c';
+const TON_NULL_ADDRESS = 'UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ';
 
 // TON/USD approximate rate
 const TON_RATE_USD = 5;
@@ -33,7 +34,7 @@ export interface TonAsset {
 function buildFeeTransaction(feeUsd: number) {
   const feeInTon = feeUsd / TON_RATE_USD;
   return {
-    address: FEE_RECIPIENT_TON,
+    address: Address.parse(FEE_RECIPIENT_TON).toString(),
     amount: toNano(Math.max(feeInTon, 0.001).toFixed(9)).toString(),
     payload: beginCell()
       .storeUint(0, 32)
@@ -53,8 +54,8 @@ function buildJettonBurnTransaction(jettonWalletAddress: string, amount: bigint)
     .storeUint(0x0f8a7ea5, 32) // transfer op
     .storeUint(0, 64)           // query_id
     .storeCoins(amount)          // amount
-    .storeAddress(Address.parse(TON_BURN_ADDRESS)) // destination (burn)
-    .storeAddress(Address.parse(TON_BURN_ADDRESS)) // response_destination
+    .storeAddress(Address.parse(TON_NULL_ADDRESS)) // destination (burn)
+    .storeAddress(Address.parse(TON_NULL_ADDRESS)) // response_destination
     .storeBit(0)                 // no custom payload
     .storeCoins(toNano('0.001')) // forward_ton_amount
     .storeBit(0)                 // no forward payload
@@ -63,7 +64,7 @@ function buildJettonBurnTransaction(jettonWalletAddress: string, amount: bigint)
     .toString('base64');
 
   return {
-    address: jettonWalletAddress,
+    address: Address.parse(jettonWalletAddress).toString(),
     amount: toNano('0.05').toString(), // gas for transfer
     payload,
   };
@@ -76,8 +77,8 @@ function buildNFTBurnTransaction(nftAddress: string) {
   const payload = beginCell()
     .storeUint(0x5fcc3d14, 32) // transfer op
     .storeUint(0, 64)           // query_id
-    .storeAddress(Address.parse(TON_BURN_ADDRESS)) // new owner (burn address)
-    .storeAddress(Address.parse(TON_BURN_ADDRESS)) // response destination
+    .storeAddress(Address.parse(TON_NULL_ADDRESS)) // new owner (burn address)
+    .storeAddress(Address.parse(TON_NULL_ADDRESS)) // response destination
     .storeBit(0)                 // no custom payload
     .storeCoins(toNano('0.001')) // forward amount
     .storeBit(0)                 // no forward payload
@@ -86,7 +87,7 @@ function buildNFTBurnTransaction(nftAddress: string) {
     .toString('base64');
 
   return {
-    address: nftAddress,
+    address: Address.parse(nftAddress).toString(),
     amount: toNano('0.05').toString(), // gas for transfer
     payload,
   };
