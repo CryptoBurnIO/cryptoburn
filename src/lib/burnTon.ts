@@ -34,7 +34,7 @@ function buildFeeTransaction(feeUsd: number) {
   const feeInTon = feeUsd / TON_RATE_USD;
   return {
     address: FEE_RECIPIENT_TON,
-    amount: toNano(Math.max(feeInTon, 0.001).toFixed(9)),
+    amount: toNano(Math.max(feeInTon, 0.001).toFixed(9)).toString(),
     payload: beginCell()
       .storeUint(0, 32)
       .storeStringTail('CryptoBurn service fee')
@@ -64,7 +64,7 @@ function buildJettonBurnTransaction(jettonWalletAddress: string, amount: bigint)
 
   return {
     address: jettonWalletAddress,
-    amount: toNano('0.05'), // gas for transfer
+    amount: toNano('0.05').toString(), // gas for transfer
     payload,
   };
 }
@@ -87,7 +87,7 @@ function buildNFTBurnTransaction(nftAddress: string) {
 
   return {
     address: nftAddress,
-    amount: toNano('0.05'), // gas for transfer
+    amount: toNano('0.05').toString(), // gas for transfer
     payload,
   };
 }
@@ -99,7 +99,7 @@ function buildNFTBurnTransaction(nftAddress: string) {
 export function buildTonBurnMessages(
   assets: TonAsset[],
   feeUsd: number
-): Array<{ address: string; amount: bigint; payload?: string }> {
+): Array<{ address: string; amount: string; payload?: string }> {
   const messages = [];
 
   // Service fee first
