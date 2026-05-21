@@ -8,6 +8,8 @@ export const FEE_RECIPIENT = '0x4B80D92Cb1e8263f5c6ff81Ec012A99ff49BE0d5' as con
 
 export const FEE_RECIPIENT_SOLANA = 'E9tPpXUc4avuP42RZ5kk5fJGkiKCXgiTDrpHhcxf9qB7' as const;
 
+export const FEE_RECIPIENT_TON = 'UQAP4B1iIGr3a3tjKkJ64ZfBA8MMGmBGT3sOOGL8J9txqDeO' as const;
+
 // Fee tiers in USD
 export const FEE_STRUCTURE = {
   TOKEN: 0.10,        // $0.10 per token burn transaction

@@ -4,6 +4,7 @@ import { WagmiProvider } from 'wagmi';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { wagmiConfig } from '@/lib/wagmi';
 import { SolanaProvider } from '@/components/SolanaProvider';
+import { TonProvider } from '@/components/TonProvider';
 import '@rainbow-me/rainbowkit/styles.css';
 
 const queryClient = new QueryClient();
@@ -23,7 +24,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           coolMode
         >
           <SolanaProvider>
-            {children}
+            <TonProvider>
+              {children}
+            </TonProvider>
           </SolanaProvider>
         </RainbowKitProvider>
       </QueryClientProvider>

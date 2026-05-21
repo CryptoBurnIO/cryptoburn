@@ -7,6 +7,7 @@ import { AssetRow } from '@/components/AssetRow';
 import { BurnModal } from '@/components/BurnModal';
 import { BurnReceipt } from '@/components/BurnReceipt';
 import { SolanaInterface } from '@/components/SolanaInterface';
+import { TonInterface } from '@/components/TonInterface';
 import { useEvmAssets } from '@/hooks/useEvmAssets';
 import { burnAsset, sendFeeOnce } from '@/lib/burnEvm';
 import { SUPPORTED_CHAINS, type ChainKey } from '@/lib/chains';
@@ -23,9 +24,13 @@ export function BurnInterface() {
   const [showModal, setShowModal] = useState(false);
   const [burnResults, setBurnResults] = useState<any[] | null>(null);
   const [burnedIds, setBurnedIds] = useState<Set<string>>(new Set());
+  const [assetFilter, setAssetFilter] = useState<'all' | 'token' | 'nft'>('all');
 
   const { assets: rawAssets, loading } = useEvmAssets(address, chainId);
   const assets = rawAssets.filter((a) => !burnedIds.has(a.id));
+  const filteredAssets = assets.filter((a) => assetFilter === 'all' || a.type === assetFilter);
+  const tokenCount = assets.filter((a) => a.type === 'token').length;
+  const nftCount = assets.filter((a) => a.type === 'nft').length;
   const chain = SUPPORTED_CHAINS[selectedChain];
   const selectedAssetObjects = assets.filter((a) => selectedAssets.has(a.id));
   const fee = calculateFee(selectedAssetObjects);
@@ -92,6 +97,18 @@ export function BurnInterface() {
     setSelectedAssets(new Set());
   };
 
+  // If TON chain selected
+  if (selectedChain === 'ton') {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <ChainSelector selected={selectedChain} onChange={handleChainChange} />
+        </div>
+        <TonInterface />
+      </div>
+    );
+  }
+
   // If Solana chain selected, show dedicated Solana interface (no EVM connection needed)
   if (selectedChain === 'solana') {
     return (
@@ -153,6 +170,27 @@ export function BurnInterface() {
         </p>
       </div>
 
+      {/* Asset Filter Tabs */}
+      <div className="flex gap-2 mb-3">
+        {[
+          { key: 'all', label: `All (${assets.length})` },
+          { key: 'token', label: `Tokens (${tokenCount})` },
+          { key: 'nft', label: `NFTs (${nftCount})` },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setAssetFilter(tab.key as 'all' | 'token' | 'nft')}
+            className={`font-mono text-xs px-3 py-1.5 rounded-sm border transition-all ${
+              assetFilter === tab.key
+                ? 'bg-orange-950/30 border-orange-500 text-orange-400'
+                : 'text-gray-500 border-gray-700 hover:border-gray-500'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Assets List */}
       <div className="bg-gray-900 border border-gray-800 rounded-sm overflow-hidden mb-4 flex flex-col" style={{maxHeight: "420px"}}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-950">
@@ -162,13 +200,13 @@ export function BurnInterface() {
           {assets.length > 0 && (
             <button
               onClick={() =>
-                selectedAssets.size === assets.length
-                  ? setSelectedAssets(new Set())
-                  : setSelectedAssets(new Set(assets.map((a) => a.id)))
+                filteredAssets.every((a) => selectedAssets.has(a.id))
+                  ? setSelectedAssets((prev) => { const next = new Set(prev); filteredAssets.forEach((a) => next.delete(a.id)); return next; })
+                  : setSelectedAssets((prev) => { const next = new Set(prev); filteredAssets.forEach((a) => next.add(a.id)); return next; })
               }
               className="font-mono text-xs text-orange-400 hover:text-orange-300 transition-colors"
             >
-              {selectedAssets.size === assets.length ? 'Deselect All' : 'Select All'}
+              {filteredAssets.every((a) => selectedAssets.has(a.id)) ? 'Deselect All' : 'Select All'}
             </button>
           )}
         </div>
@@ -184,7 +222,7 @@ export function BurnInterface() {
               <p className="text-gray-500 text-sm">No assets found on {chain.name}</p>
             </div>
           ) : (
-            assets.map((asset) => (
+            filteredAssets.map((asset) => (
               <AssetRow
                 key={asset.id}
                 asset={asset}

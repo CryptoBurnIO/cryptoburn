@@ -239,6 +239,16 @@ export const SUPPORTED_CHAINS = {
     type: 'solana' as const,
     category: 'L1',
   },
+  ton: {
+    id: 'ton',
+    name: 'TON',
+    symbol: 'TON',
+    color: '#0088cc',
+    burnAddress: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c',
+    explorer: 'https://tonscan.org',
+    type: 'ton' as const,
+    category: 'L1',
+  },
 } as const;
 
 export type ChainKey = keyof typeof SUPPORTED_CHAINS;

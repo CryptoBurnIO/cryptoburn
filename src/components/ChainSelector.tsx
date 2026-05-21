@@ -10,9 +10,7 @@ interface ChainSelectorProps {
 type Category = 'All' | 'L1' | 'L2';
 
 // Chains that are coming soon — shown as disabled buttons
-const COMING_SOON = [
-  { name: 'TON', color: '#0088cc', category: 'L1' },
-];
+const COMING_SOON: Array<{ name: string; color: string; category: string }> = [];
 
 export function ChainSelector({ selected, onChange }: ChainSelectorProps) {
   const [filter, setFilter] = useState<Category>('All');
