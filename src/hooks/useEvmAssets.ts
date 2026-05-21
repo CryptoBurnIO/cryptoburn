@@ -42,9 +42,9 @@ export function useEvmAssets(address: string | undefined, chainId: number | unde
         const moralisChain = MORALIS_CHAIN_IDS[chainId] || '0x1';
         const apiKey = process.env.NEXT_PUBLIC_MORALIS_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjAyZWMzZjExLTMxOGUtNDU3NS1hZDczLWU5MmJmYzlkYTliMCIsIm9yZ0lkIjoiNTAyMTc1IiwidXNlcklkIjoiNTE2NzEzIiwidHlwZUlkIjoiYWU3OGY4MmItZGMyYS00N2VhLTgyYTYtNGNhM2ZmMGRmOGEyIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NzE5NTg3NjksImV4cCI6NDkyNzcxODc2OX0.DiLMJyvz8ie3xB5rFvUagtOjpoKCZ1oZuBBwy0WLeDA';
 
-        // Fetch ERC-20 tokens
+        // Fetch ERC-20 tokens using new Token API
         const tokenRes = await fetch(
-          `https://deep-index.moralis.io/api/v2.2/${address}/erc20?chain=${moralisChain}`,
+          `https://deep-index.moralis.io/api/v2.2/wallets/${address}/tokens?chain=${moralisChain}`,
           { headers: { 'X-API-Key': apiKey } }
         );
         const tokenData = await tokenRes.json();
@@ -57,17 +57,17 @@ export function useEvmAssets(address: string | undefined, chainId: number | unde
         const nftData = await nftRes.json();
 
         const chainKey = getChainKey(chainId);
-        const tokens: Asset[] = (tokenData.result || []).map((t: any) => ({
-          id: `${t.token_address}-${chainId}`,
+        const tokens: Asset[] = ((tokenData.result || tokenData.tokens || []).filter((t: any) => t.token_address || t.contract_address)).map((t: any) => ({
+          id: `${t.token_address || t.contract_address}-${chainId}`,
           name: t.name || 'Unknown Token',
           symbol: t.symbol || '???',
           type: 'token' as const,
-          balance: (Number(t.balance) / 10 ** (t.decimals || 18)).toFixed(4),
+          balance: (Number(t.balance || t.balance_formatted || '0') / 10 ** (t.decimals || 18)).toFixed(4),
           balanceRaw: BigInt(t.balance || '0'),
           decimals: t.decimals || 18,
-          contractAddress: t.token_address,
+          contractAddress: t.token_address || t.contract_address,
           usdValue: t.usd_value ? `$${Number(t.usd_value).toFixed(2)}` : '< $0.01',
-          logoUrl: t.logo,
+          logoUrl: t.logo || t.thumbnail,
           chain: chainKey,
         }));
 
