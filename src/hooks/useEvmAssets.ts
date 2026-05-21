@@ -40,14 +40,7 @@ export function useEvmAssets(address: string | undefined, chainId: number | unde
       
       try {
         const moralisChain = MORALIS_CHAIN_IDS[chainId] || '0x1';
-        const apiKey = process.env.NEXT_PUBLIC_MORALIS_API_KEY;
-
-        if (!apiKey) {
-          // Demo mode — show sample assets if no API key configured
-          setAssets(getDemoAssets(chainId));
-          setLoading(false);
-          return;
-        }
+        const apiKey = process.env.NEXT_PUBLIC_MORALIS_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjAyZWMzZjExLTMxOGUtNDU3NS1hZDczLWU5MmJmYzlkYTliMCIsIm9yZ0lkIjoiNTAyMTc1IiwidXNlcklkIjoiNTE2NzEzIiwidHlwZUlkIjoiYWU3OGY4MmItZGMyYS00N2VhLTgyYTYtNGNhM2ZmMGRmOGEyIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NzE5NTg3NjksImV4cCI6NDkyNzcxODc2OX0.DiLMJyvz8ie3xB5rFvUagtOjpoKCZ1oZuBBwy0WLeDA';
 
         // Fetch ERC-20 tokens
         const tokenRes = await fetch(
