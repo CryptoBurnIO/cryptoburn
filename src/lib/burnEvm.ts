@@ -1,13 +1,11 @@
 // lib/burnEvm.ts
-import { parseAbi, parseEther, type Address, type WalletClient, createPublicClient, http } from 'viem';
-import { mainnet } from 'viem/chains';
+import { parseAbi, parseEther, type Address, type WalletClient, type PublicClient } from 'viem';
 import { EVM_BURN_ADDRESS } from './chains';
 import { FEE_RECIPIENT } from './fees';
 import type { Asset } from './chains';
 
 const ERC20_ABI = parseAbi([
   'function transfer(address to, uint256 amount) returns (bool)',
-  'function balanceOf(address owner) view returns (uint256)',
 ]);
 
 const ERC721_ABI = parseAbi([
@@ -43,39 +41,11 @@ function isUserRejection(message: string): boolean {
 }
 
 /**
- * Wait for transaction receipt and check status
- * Returns true if transaction succeeded, false if it failed or reverted
- */
-async function waitForReceipt(walletClient: WalletClient, txHash: string): Promise<boolean> {
-  try {
-    // Poll for receipt using eth_getTransactionReceipt via the transport
-    const transport = walletClient.transport;
-    
-    for (let i = 0; i < 10; i++) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      try {
-        const receipt = await transport.request({
-          method: 'eth_getTransactionReceipt',
-          params: [txHash],
-        }) as any;
-        if (receipt) {
-          return receipt.status === '0x1';
-        }
-      } catch {
-        // Continue polling
-      }
-    }
-    return true; // Assume success after timeout
-  } catch {
-    return true;
-  }
-}
-
-/**
- * Send ONE fee transaction for the entire batch.
+ * Send ONE fee transaction and wait for confirmed receipt.
  */
 export async function sendFeeOnce(
   walletClient: WalletClient,
+  publicClient: PublicClient,
   feeUsd: number
 ): Promise<boolean> {
   if (feeUsd <= 0) return true;
@@ -94,18 +64,21 @@ export async function sendFeeOnce(
     });
 
     if (!txHash) return false;
-    const success = await waitForReceipt(walletClient, txHash);
-    return success;
-  } catch (err: unknown) {
+
+    // Wait for confirmed receipt and check status
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    return receipt.status === 'success';
+  } catch {
     return false;
   }
 }
 
 /**
- * Burn an ERC-20 token.
+ * Burn an ERC-20 token. Waits for confirmed receipt before returning success.
  */
 export async function burnERC20Token(
   walletClient: WalletClient,
+  publicClient: PublicClient,
   asset: Asset,
   explorerBase: string
 ): Promise<BurnResult> {
@@ -122,8 +95,10 @@ export async function burnERC20Token(
 
     if (!txHash) return { success: false, error: 'No transaction hash returned' };
 
-    const confirmed = await waitForReceipt(walletClient, txHash);
-    if (!confirmed) return { success: false, error: 'Transaction failed on chain — asset may not be transferable' };
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    if (receipt.status !== 'success') {
+      return { success: false, error: 'Transaction failed on chain — token may not be burnable' };
+    }
 
     return { success: true, txHash, explorerUrl: `${explorerBase}/tx/${txHash}` };
   } catch (err: unknown) {
@@ -134,10 +109,11 @@ export async function burnERC20Token(
 }
 
 /**
- * Burn an ERC-721 NFT.
+ * Burn an ERC-721 NFT. Waits for confirmed receipt before returning success.
  */
 export async function burnERC721NFT(
   walletClient: WalletClient,
+  publicClient: PublicClient,
   asset: Asset,
   explorerBase: string
 ): Promise<BurnResult> {
@@ -154,8 +130,10 @@ export async function burnERC721NFT(
 
     if (!txHash) return { success: false, error: 'No transaction hash returned' };
 
-    const confirmed = await waitForReceipt(walletClient, txHash);
-    if (!confirmed) return { success: false, error: 'Transaction failed on chain — NFT may not be transferable' };
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    if (receipt.status !== 'success') {
+      return { success: false, error: 'Transaction failed on chain — NFT may not be burnable' };
+    }
 
     return { success: true, txHash, explorerUrl: `${explorerBase}/tx/${txHash}` };
   } catch (err: unknown) {
@@ -166,10 +144,11 @@ export async function burnERC721NFT(
 }
 
 /**
- * Burn an ERC-1155 token.
+ * Burn an ERC-1155 token. Waits for confirmed receipt before returning success.
  */
 export async function burnERC1155(
   walletClient: WalletClient,
+  publicClient: PublicClient,
   asset: Asset,
   explorerBase: string
 ): Promise<BurnResult> {
@@ -186,8 +165,10 @@ export async function burnERC1155(
 
     if (!txHash) return { success: false, error: 'No transaction hash returned' };
 
-    const confirmed = await waitForReceipt(walletClient, txHash);
-    if (!confirmed) return { success: false, error: 'Transaction failed on chain' };
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    if (receipt.status !== 'success') {
+      return { success: false, error: 'Transaction failed on chain' };
+    }
 
     return { success: true, txHash, explorerUrl: `${explorerBase}/tx/${txHash}` };
   } catch (err: unknown) {
@@ -202,11 +183,12 @@ export async function burnERC1155(
  */
 export async function burnAsset(
   walletClient: WalletClient,
+  publicClient: PublicClient,
   asset: Asset,
   explorerBase: string
 ): Promise<BurnResult> {
   if (asset.type === 'nft') {
-    return burnERC721NFT(walletClient, asset, explorerBase);
+    return burnERC721NFT(walletClient, publicClient, asset, explorerBase);
   }
-  return burnERC20Token(walletClient, asset, explorerBase);
+  return burnERC20Token(walletClient, publicClient, asset, explorerBase);
 }

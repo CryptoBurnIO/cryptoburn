@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useAccount, useWalletClient, useChainId, useSwitchChain } from 'wagmi';
+import { useAccount, useWalletClient, useChainId, useSwitchChain, usePublicClient } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { ChainSelector } from '@/components/ChainSelector';
 import { AssetRow } from '@/components/AssetRow';
@@ -16,6 +16,7 @@ import { calculateFee } from '@/lib/fees';
 export function BurnInterface() {
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
 
@@ -65,7 +66,7 @@ export function BurnInterface() {
 
     // Step 1: Collect the SINGLE fee for the entire batch upfront
     // If user cancels this, the whole burn is cancelled
-    const feeSuccess = await sendFeeOnce(walletClient, fee.totalUsd);
+    const feeSuccess = await sendFeeOnce(walletClient, publicClient!, fee.totalUsd);
     if (!feeSuccess) {
       setShowModal(false);
       return; // User cancelled fee — abort everything, no burns happen
@@ -74,7 +75,7 @@ export function BurnInterface() {
     // Step 2: Burn all selected assets (no more fee requests)
     const results: Array<{ assetName: string; txHash: string; explorerUrl: string; success: boolean; error?: string }> = [];
     for (const asset of selectedAssetObjects) {
-      const result = await burnAsset(walletClient, asset, chain.explorer);
+      const result = await burnAsset(walletClient, publicClient!, asset, chain.explorer);
       results.push({
         assetName: asset.name,
         txHash: result.txHash || '',
