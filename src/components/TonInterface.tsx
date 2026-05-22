@@ -96,32 +96,34 @@ export function TonInterface() {
             }],
           });
 
-          // Verify transaction actually confirmed on TON chain
-          const txSuccess = !!(result.boc && result.boc.length > 0);
-          
-          if (txSuccess) {
-            // Wait a moment then verify on chain via TON API
-            await new Promise(resolve => setTimeout(resolve, 3000));
+          // Only mark success if wallet returned a valid boc
+          if (result?.boc && result.boc.length > 10) {
+            // Wait for TON to process then verify NFT is gone
+            await new Promise(resolve => setTimeout(resolve, 5000));
             try {
               const verifyRes = await fetch(
-                `https://tonapi.io/v2/accounts/${asset.contractAddress}/events?limit=5`
+                `https://tonapi.io/v2/nfts/${asset.contractAddress}`
               );
               const verifyData = await verifyRes.json();
-              const recentEvents = verifyData?.events || [];
-              // If the NFT/token still exists in recent events with transfer to burn address, it worked
+              // If owner is now the burn/null address, it worked
+              const newOwner = verifyData?.owner?.address || '';
+              const isBurned = newOwner.includes('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA') || 
+                               !verifyData?.owner;
+              
               results.push({
                 assetName: asset.name,
-                txHash: result.boc || '',
-                explorerUrl: `https://tonscan.org`,
-                success: true,
+                txHash: result.boc,
+                explorerUrl: 'https://tonscan.org',
+                success: isBurned,
+                error: isBurned ? undefined : 'Transaction submitted but NFT still appears in wallet — may not have burned',
               });
-              successfulIds.add(asset.id);
+              if (isBurned) successfulIds.add(asset.id);
             } catch {
-              // If verification fails just trust the boc
+              // Can't verify — trust the wallet response
               results.push({
                 assetName: asset.name,
-                txHash: result.boc || '',
-                explorerUrl: `https://tonscan.org`,
+                txHash: result.boc,
+                explorerUrl: 'https://tonscan.org',
                 success: true,
               });
               successfulIds.add(asset.id);
@@ -132,7 +134,7 @@ export function TonInterface() {
               txHash: '',
               explorerUrl: '',
               success: false,
-              error: 'Transaction was not confirmed by wallet',
+              error: 'Transaction rejected or cancelled',
             });
           }
 

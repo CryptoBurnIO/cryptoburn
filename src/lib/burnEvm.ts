@@ -66,7 +66,7 @@ export async function sendFeeOnce(
     if (!txHash) return false;
 
     // Wait for confirmed receipt and check status
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 30_000 });
     return receipt.status === 'success';
   } catch {
     return false;
@@ -95,7 +95,7 @@ export async function burnERC20Token(
 
     if (!txHash) return { success: false, error: 'No transaction hash returned' };
 
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 30_000 });
     if (receipt.status !== 'success') {
       return { success: false, error: 'Transaction failed on chain — token may not be burnable' };
     }
@@ -104,6 +104,7 @@ export async function burnERC20Token(
   } catch (err: unknown) {
     const error = err as Error;
     if (isUserRejection(error.message || '')) return { success: false, error: 'User rejected the request.' };
+    if (error.message?.includes('timed out') || error.message?.includes('timeout')) return { success: false, error: 'Transaction timed out — it may have been cancelled or failed.' };
     return { success: false, error: error.message || 'Transaction failed' };
   }
 }
@@ -130,7 +131,7 @@ export async function burnERC721NFT(
 
     if (!txHash) return { success: false, error: 'No transaction hash returned' };
 
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 30_000 });
     if (receipt.status !== 'success') {
       return { success: false, error: 'Transaction failed on chain — NFT may not be burnable' };
     }
@@ -139,6 +140,7 @@ export async function burnERC721NFT(
   } catch (err: unknown) {
     const error = err as Error;
     if (isUserRejection(error.message || '')) return { success: false, error: 'User rejected the request.' };
+    if (error.message?.includes('timed out') || error.message?.includes('timeout')) return { success: false, error: 'Transaction timed out — it may have been cancelled or failed.' };
     return { success: false, error: error.message || 'Transaction failed' };
   }
 }
@@ -165,7 +167,7 @@ export async function burnERC1155(
 
     if (!txHash) return { success: false, error: 'No transaction hash returned' };
 
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 30_000 });
     if (receipt.status !== 'success') {
       return { success: false, error: 'Transaction failed on chain' };
     }
@@ -174,6 +176,7 @@ export async function burnERC1155(
   } catch (err: unknown) {
     const error = err as Error;
     if (isUserRejection(error.message || '')) return { success: false, error: 'User rejected the request.' };
+    if (error.message?.includes('timed out') || error.message?.includes('timeout')) return { success: false, error: 'Transaction timed out — it may have been cancelled or failed.' };
     return { success: false, error: error.message || 'Transaction failed' };
   }
 }
