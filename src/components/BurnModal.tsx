@@ -93,6 +93,16 @@ export function BurnModal({ assets, chainKey, fee, onConfirm, onCancel }: BurnMo
           <p className="text-gray-600 text-xs font-mono">Fees keep CryptoBurn running. No hidden costs.</p>
         </div>
 
+        {/* MetaMask security warning notice */}
+        <div className="bg-yellow-950/20 border border-yellow-900/40 rounded-sm p-3 mb-4">
+          <p className="font-mono text-xs text-yellow-600 mb-1">⚠️ MetaMask security warning — expected</p>
+          <p className="font-mono text-xs text-gray-500 leading-relaxed">
+            MetaMask may flag this transaction as suspicious because it sends to the burn address. 
+            This is normal for any burn tool. The destination is the verified null address that 
+            nobody controls. It is safe to proceed.
+          </p>
+        </div>
+
         {/* Type BURN to confirm */}
         <div className="mb-4">
           <p className="font-mono text-xs text-gray-500 mb-2 tracking-widest">
