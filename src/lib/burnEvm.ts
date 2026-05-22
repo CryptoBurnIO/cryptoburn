@@ -1,5 +1,5 @@
 // lib/burnEvm.ts
-import { parseAbi, parseEther, type Address, type WalletClient } from 'viem';
+import { parseAbi, parseEther, type Address, type WalletClient, createPublicClient, http } from 'viem';
 import { EVM_BURN_ADDRESS } from './chains';
 import { FEE_RECIPIENT } from './fees';
 import type { Asset } from './chains';
@@ -88,9 +88,14 @@ export async function burnERC20Token(
       account,
       chain: null,
     });
+    if (!txHash) return { success: false, error: 'No transaction hash returned' };
     return { success: true, txHash, explorerUrl: `${explorerBase}/tx/${txHash}` };
   } catch (err: unknown) {
     const error = err as Error;
+    // User rejected or transaction failed
+    if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.message?.includes('denied')) {
+      return { success: false, error: 'User rejected the request.' };
+    }
     return { success: false, error: error.message || 'Transaction failed' };
   }
 }
@@ -113,9 +118,13 @@ export async function burnERC721NFT(
       account,
       chain: null,
     });
+    if (!txHash) return { success: false, error: 'No transaction hash returned' };
     return { success: true, txHash, explorerUrl: `${explorerBase}/tx/${txHash}` };
   } catch (err: unknown) {
     const error = err as Error;
+    if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.message?.includes('denied')) {
+      return { success: false, error: 'User rejected the request.' };
+    }
     return { success: false, error: error.message || 'Transaction failed' };
   }
 }

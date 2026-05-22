@@ -96,13 +96,15 @@ export function TonInterface() {
             }],
           });
 
+          const txSuccess = !!(result.boc && result.boc.length > 0);
           results.push({
             assetName: asset.name,
             txHash: result.boc || '',
             explorerUrl: result.boc ? `https://tonscan.org/tx/${result.boc}` : '',
-            success: true,
+            success: txSuccess,
+            error: txSuccess ? undefined : 'Transaction was not confirmed by wallet',
           });
-          successfulIds.add(asset.id);
+          if (txSuccess) successfulIds.add(asset.id);
 
         } catch (assetErr: unknown) {
           const error = assetErr as Error;

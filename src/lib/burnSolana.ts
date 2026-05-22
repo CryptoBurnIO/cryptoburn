@@ -88,6 +88,9 @@ export async function burnSPLToken(
     return { success: true, txHash, explorerUrl: `https://solscan.io/tx/${txHash}` };
   } catch (err: unknown) {
     const error = err as Error;
+    if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.message?.includes('Transaction cancelled')) {
+      return { success: false, error: 'User rejected the request.' };
+    }
     return { success: false, error: error.message || 'Solana transaction failed' };
   }
 }
@@ -146,6 +149,9 @@ export async function burnSolanaNFT(
     return { success: true, txHash, explorerUrl: `https://solscan.io/tx/${txHash}` };
   } catch (err: unknown) {
     const error = err as Error;
+    if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.message?.includes('Transaction cancelled')) {
+      return { success: false, error: 'User rejected the request.' };
+    }
     return { success: false, error: error.message || 'Solana NFT burn failed' };
   }
 }
