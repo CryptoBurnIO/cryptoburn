@@ -83,7 +83,11 @@ export async function burnSPLToken(
 
     const signed = await signTransaction(transaction);
     const txHash = await connection.sendRawTransaction(signed.serialize());
-    await connection.confirmTransaction(txHash, 'confirmed');
+    const confirmation = await connection.confirmTransaction(txHash, 'confirmed');
+    
+    if (confirmation.value.err) {
+      return { success: false, error: 'Transaction failed on chain — token may not be burnable' };
+    }
 
     return { success: true, txHash, explorerUrl: `https://solscan.io/tx/${txHash}` };
   } catch (err: unknown) {
@@ -144,7 +148,11 @@ export async function burnSolanaNFT(
       skipPreflight: false,
       preflightCommitment: 'confirmed',
     });
-    await connection.confirmTransaction(txHash, 'confirmed');
+    const confirmation = await connection.confirmTransaction(txHash, 'confirmed');
+    
+    if (confirmation.value.err) {
+      return { success: false, error: 'Transaction failed on chain — NFT may not be burnable' };
+    }
 
     return { success: true, txHash, explorerUrl: `https://solscan.io/tx/${txHash}` };
   } catch (err: unknown) {

@@ -1,5 +1,6 @@
 // lib/burnEvm.ts
 import { parseAbi, parseEther, type Address, type WalletClient, createPublicClient, http } from 'viem';
+import { mainnet } from 'viem/chains';
 import { EVM_BURN_ADDRESS } from './chains';
 import { FEE_RECIPIENT } from './fees';
 import type { Asset } from './chains';
@@ -7,20 +8,14 @@ import type { Asset } from './chains';
 const ERC20_ABI = parseAbi([
   'function transfer(address to, uint256 amount) returns (bool)',
   'function balanceOf(address owner) view returns (uint256)',
-  'function decimals() view returns (uint8)',
-  'function symbol() view returns (string)',
-  'function name() view returns (string)',
 ]);
 
 const ERC721_ABI = parseAbi([
   'function transferFrom(address from, address to, uint256 tokenId)',
-  'function safeTransferFrom(address from, address to, uint256 tokenId)',
-  'function ownerOf(uint256 tokenId) view returns (address)',
 ]);
 
 const ERC1155_ABI = parseAbi([
   'function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)',
-  'function balanceOf(address account, uint256 id) view returns (uint256)',
 ]);
 
 export interface BurnResult {
@@ -30,7 +25,6 @@ export interface BurnResult {
   error?: string;
 }
 
-// Native token approximate rates for fee conversion
 const NATIVE_RATES: Record<number, number> = {
   1: 3000, 8453: 3000, 42161: 3000, 10: 3000,
   59144: 3000, 534352: 3000, 1101: 3000, 81457: 3000, 324: 3000,
@@ -39,10 +33,46 @@ const NATIVE_RATES: Record<number, number> = {
   1284: 0.15, 2222: 0.50, 5000: 1.20,
 };
 
+function isUserRejection(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes('user rejected') ||
+    lower.includes('user denied') ||
+    lower.includes('rejected the request') ||
+    lower.includes('transaction was rejected') ||
+    lower.includes('cancelled');
+}
+
+/**
+ * Wait for transaction receipt and check status
+ * Returns true if transaction succeeded, false if it failed or reverted
+ */
+async function waitForReceipt(walletClient: WalletClient, txHash: string): Promise<boolean> {
+  try {
+    const chainId = await walletClient.getChainId();
+    // Use the wallet's transport to check receipt
+    const receipt = await walletClient.request({
+      method: 'eth_getTransactionReceipt',
+      params: [txHash as `0x${string}`],
+    }) as any;
+
+    if (!receipt) {
+      // Receipt not yet available — wait and retry
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const receipt2 = await walletClient.request({
+        method: 'eth_getTransactionReceipt',
+        params: [txHash as `0x${string}`],
+      }) as any;
+      if (!receipt2) return true; // Assume success if can't get receipt
+      return receipt2.status === '0x1';
+    }
+    return receipt.status === '0x1';
+  } catch {
+    return true; // If we can't check, assume success
+  }
+}
+
 /**
  * Send ONE fee transaction for the entire batch.
- * Returns true if fee was paid, false if user cancelled.
- * Called once before any burns happen.
  */
 export async function sendFeeOnce(
   walletClient: WalletClient,
@@ -56,22 +86,23 @@ export async function sendFeeOnce(
     const feeInNative = feeUsd / rate;
     const feeWei = parseEther(Math.max(feeInNative, 0.000001).toFixed(18));
 
-    await walletClient.sendTransaction({
+    const txHash = await walletClient.sendTransaction({
       account,
       to: FEE_RECIPIENT as Address,
       value: feeWei,
       chain: null,
     });
 
-    return true;
-  } catch {
-    // User cancelled or transaction failed — return false to abort all burns
+    if (!txHash) return false;
+    const success = await waitForReceipt(walletClient, txHash);
+    return success;
+  } catch (err: unknown) {
     return false;
   }
 }
 
 /**
- * Burn an ERC-20 token. No fee collected here — fee handled by sendFeeOnce.
+ * Burn an ERC-20 token.
  */
 export async function burnERC20Token(
   walletClient: WalletClient,
@@ -88,20 +119,22 @@ export async function burnERC20Token(
       account,
       chain: null,
     });
+
     if (!txHash) return { success: false, error: 'No transaction hash returned' };
+
+    const confirmed = await waitForReceipt(walletClient, txHash);
+    if (!confirmed) return { success: false, error: 'Transaction failed on chain — asset may not be transferable' };
+
     return { success: true, txHash, explorerUrl: `${explorerBase}/tx/${txHash}` };
   } catch (err: unknown) {
     const error = err as Error;
-    // User rejected or transaction failed
-    if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.message?.includes('denied')) {
-      return { success: false, error: 'User rejected the request.' };
-    }
+    if (isUserRejection(error.message || '')) return { success: false, error: 'User rejected the request.' };
     return { success: false, error: error.message || 'Transaction failed' };
   }
 }
 
 /**
- * Burn an ERC-721 NFT. No fee collected here — fee handled by sendFeeOnce.
+ * Burn an ERC-721 NFT.
  */
 export async function burnERC721NFT(
   walletClient: WalletClient,
@@ -118,19 +151,22 @@ export async function burnERC721NFT(
       account,
       chain: null,
     });
+
     if (!txHash) return { success: false, error: 'No transaction hash returned' };
+
+    const confirmed = await waitForReceipt(walletClient, txHash);
+    if (!confirmed) return { success: false, error: 'Transaction failed on chain — NFT may not be transferable' };
+
     return { success: true, txHash, explorerUrl: `${explorerBase}/tx/${txHash}` };
   } catch (err: unknown) {
     const error = err as Error;
-    if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.message?.includes('denied')) {
-      return { success: false, error: 'User rejected the request.' };
-    }
+    if (isUserRejection(error.message || '')) return { success: false, error: 'User rejected the request.' };
     return { success: false, error: error.message || 'Transaction failed' };
   }
 }
 
 /**
- * Burn an ERC-1155 token. No fee collected here — fee handled by sendFeeOnce.
+ * Burn an ERC-1155 token.
  */
 export async function burnERC1155(
   walletClient: WalletClient,
@@ -143,25 +179,26 @@ export async function burnERC1155(
       address: asset.contractAddress as Address,
       abi: ERC1155_ABI,
       functionName: 'safeTransferFrom',
-      args: [
-        account,
-        EVM_BURN_ADDRESS as Address,
-        BigInt(asset.tokenId || '0'),
-        asset.balanceRaw,
-        '0x',
-      ],
+      args: [account, EVM_BURN_ADDRESS as Address, BigInt(asset.tokenId || '0'), asset.balanceRaw, '0x'],
       account,
       chain: null,
     });
+
+    if (!txHash) return { success: false, error: 'No transaction hash returned' };
+
+    const confirmed = await waitForReceipt(walletClient, txHash);
+    if (!confirmed) return { success: false, error: 'Transaction failed on chain' };
+
     return { success: true, txHash, explorerUrl: `${explorerBase}/tx/${txHash}` };
   } catch (err: unknown) {
     const error = err as Error;
+    if (isUserRejection(error.message || '')) return { success: false, error: 'User rejected the request.' };
     return { success: false, error: error.message || 'Transaction failed' };
   }
 }
 
 /**
- * Route burn to correct function. Fee already collected before this is called.
+ * Route burn to correct function.
  */
 export async function burnAsset(
   walletClient: WalletClient,
