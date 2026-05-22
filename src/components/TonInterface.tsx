@@ -6,6 +6,7 @@ import { BurnModal } from '@/components/BurnModal';
 import { BurnReceipt } from '@/components/BurnReceipt';
 import { useTonAssets } from '@/hooks/useTonAssets';
 import { buildTonBurnMessages } from '@/lib/burnTon';
+import { FEE_RECIPIENT_TON } from '@/lib/fees';
 import { calculateFee } from '@/lib/fees';
 import type { TonAsset } from '@/lib/burnTon';
 
@@ -39,34 +40,84 @@ export function TonInterface() {
     if (!walletAddress || selectedAssetObjects.length === 0) return;
 
     try {
-      const tonAssets: TonAsset[] = selectedAssetObjects.map((a) => ({
-        id: a.id,
-        name: a.name,
-        symbol: a.symbol,
-        type: a.type,
-        balance: a.balanceRaw.toString(),
-        contractAddress: a.contractAddress,
-        decimals: a.decimals,
-      }));
+      const results: Array<{ assetName: string; txHash: string; explorerUrl: string; success: boolean; error?: string }> = [];
+      const successfulIds = new Set<string>();
 
-      const messages = buildTonBurnMessages(tonAssets, fee.totalUsd);
+      // Send fee first as a single transaction
+      if (fee.totalUsd > 0) {
+        const feeInTon = fee.totalUsd / 5;
+        const { Address, toNano, beginCell } = await import('@ton/ton');
+        const feeTx = await tonConnectUI.sendTransaction({
+          validUntil: Math.floor(Date.now() / 1000) + 600,
+          messages: [{
+            address: Address.parse(FEE_RECIPIENT_TON).toString(),
+            amount: toNano(Math.max(feeInTon, 0.001).toFixed(9)).toString(),
+            payload: beginCell().storeUint(0,32).storeStringTail('CryptoBurn fee').endCell().toBoc().toString('base64'),
+          }],
+        });
+        if (!feeTx.boc) throw new Error('Fee transaction failed');
+      }
 
-      const result = await tonConnectUI.sendTransaction({
-        validUntil: Math.floor(Date.now() / 1000) + 600,
-        messages,
-      });
+      // Burn each asset individually
+      for (const asset of selectedAssetObjects) {
+        try {
+          const { Address, toNano, beginCell } = await import('@ton/ton');
+          
+          let payload: string;
+          if (asset.type === 'nft') {
+            payload = beginCell()
+              .storeUint(0x5fcc3d14, 32)
+              .storeUint(0, 64)
+              .storeAddress(Address.parse('UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ'))
+              .storeAddress(Address.parse('UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ'))
+              .storeBit(0)
+              .storeCoins(toNano('0.001'))
+              .storeBit(0)
+              .endCell().toBoc().toString('base64');
+          } else {
+            payload = beginCell()
+              .storeUint(0x0f8a7ea5, 32)
+              .storeUint(0, 64)
+              .storeCoins(BigInt(asset.balanceRaw))
+              .storeAddress(Address.parse('UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ'))
+              .storeAddress(Address.parse('UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ'))
+              .storeBit(0)
+              .storeCoins(toNano('0.001'))
+              .storeBit(0)
+              .endCell().toBoc().toString('base64');
+          }
 
-      const results = selectedAssetObjects.map((asset) => ({
-        assetName: asset.name,
-        txHash: result.boc || '',
-        explorerUrl: result.boc ? `https://tonscan.org/tx/${result.boc}` : '',
-        success: true,
-      }));
+          const result = await tonConnectUI.sendTransaction({
+            validUntil: Math.floor(Date.now() / 1000) + 600,
+            messages: [{
+              address: Address.parse(asset.contractAddress).toString(),
+              amount: toNano('0.05').toString(),
+              payload,
+            }],
+          });
+
+          results.push({
+            assetName: asset.name,
+            txHash: result.boc || '',
+            explorerUrl: result.boc ? `https://tonscan.org/tx/${result.boc}` : '',
+            success: true,
+          });
+          successfulIds.add(asset.id);
+
+        } catch (assetErr: unknown) {
+          const error = assetErr as Error;
+          results.push({
+            assetName: asset.name,
+            txHash: '',
+            explorerUrl: '',
+            success: false,
+            error: error.message || 'TON burn failed',
+          });
+        }
+      }
 
       setShowModal(false);
       setBurnResults(results);
-
-      const successfulIds = new Set(selectedAssetObjects.map((a) => a.id));
       setBurnedIds((prev) => new Set([...prev, ...successfulIds]));
       setSelectedAssets(new Set());
 
