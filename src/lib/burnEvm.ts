@@ -48,26 +48,26 @@ function isUserRejection(message: string): boolean {
  */
 async function waitForReceipt(walletClient: WalletClient, txHash: string): Promise<boolean> {
   try {
-    const chainId = await walletClient.getChainId();
-    // Use the wallet's transport to check receipt
-    const receipt = await walletClient.request({
-      method: 'eth_getTransactionReceipt',
-      params: [txHash as `0x${string}`],
-    }) as any;
-
-    if (!receipt) {
-      // Receipt not yet available — wait and retry
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      const receipt2 = await walletClient.request({
-        method: 'eth_getTransactionReceipt',
-        params: [txHash as `0x${string}`],
-      }) as any;
-      if (!receipt2) return true; // Assume success if can't get receipt
-      return receipt2.status === '0x1';
+    // Poll for receipt using eth_getTransactionReceipt via the transport
+    const transport = walletClient.transport;
+    
+    for (let i = 0; i < 10; i++) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      try {
+        const receipt = await transport.request({
+          method: 'eth_getTransactionReceipt',
+          params: [txHash],
+        }) as any;
+        if (receipt) {
+          return receipt.status === '0x1';
+        }
+      } catch {
+        // Continue polling
+      }
     }
-    return receipt.status === '0x1';
+    return true; // Assume success after timeout
   } catch {
-    return true; // If we can't check, assume success
+    return true;
   }
 }
 
