@@ -27,7 +27,7 @@ export function BurnInterface() {
   const [burnedIds, setBurnedIds] = useState<Set<string>>(new Set());
   const [assetFilter, setAssetFilter] = useState<'all' | 'token' | 'nft'>('all');
 
-  const { assets: rawAssets, loading } = useEvmAssets(address, chainId);
+  const { assets: rawAssets, loading, scanning, hiddenCount } = useEvmAssets(address, chainId);
   const assets = rawAssets.filter((a) => !burnedIds.has(a.id));
   const filteredAssets = assets.filter((a) => assetFilter === 'all' || a.type === assetFilter);
   const tokenCount = assets.filter((a) => a.type === 'token').length;
@@ -218,6 +218,13 @@ export function BurnInterface() {
               <div className="text-2xl mb-3 animate-pulse">🔥</div>
               <p className="text-gray-500 font-mono text-sm">Scanning wallet...</p>
             </div>
+          ) : scanning ? (
+            <div className="p-4 text-center">
+              <div className="text-xl mb-2 animate-pulse">🔍</div>
+              <p className="text-gray-500 font-mono text-xs">Checking which assets are burnable...</p>
+              <p className="text-gray-600 font-mono text-xs mt-1">This may take a moment — we simulate each burn before showing it</p>
+              {assets.length > 0 && <p className="text-orange-400 font-mono text-xs mt-1">{assets.length} burnable found so far...</p>}
+            </div>
           ) : assets.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-gray-500 text-sm">No assets found on {chain.name}</p>
@@ -234,6 +241,15 @@ export function BurnInterface() {
           )}
         </div>
       </div>
+
+      {/* Hidden assets notice */}
+      {hiddenCount > 0 && !scanning && (
+        <div className="bg-gray-900/50 border border-gray-800 rounded-sm p-3 mb-4">
+          <p className="font-mono text-xs text-gray-600">
+            ℹ️ {hiddenCount} asset{hiddenCount !== 1 ? 's' : ''} hidden — not burnable. Some tokens and NFTs have contracts that block transfers by design. Only burnable assets are shown here.
+          </p>
+        </div>
+      )}
 
       {/* Burn Footer */}
       {selectedAssets.size > 0 && (

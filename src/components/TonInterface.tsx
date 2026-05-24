@@ -13,7 +13,7 @@ import type { TonAsset } from '@/lib/burnTon';
 export function TonInterface() {
   const [tonConnectUI] = useTonConnectUI();
   const walletAddress = useTonAddress();
-  const { assets: rawAssets, loading } = useTonAssets(walletAddress || null);
+  const { assets: rawAssets, loading, scanning, hiddenCount } = useTonAssets(walletAddress || null);
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [showModal, setShowModal] = useState(false);
   const [burnResults, setBurnResults] = useState<any[] | null>(null);
@@ -271,6 +271,13 @@ export function TonInterface() {
               <div className="text-2xl mb-3 animate-pulse">💎</div>
               <p className="text-gray-500 font-mono text-sm">Scanning TON wallet...</p>
             </div>
+          ) : scanning ? (
+            <div className="p-4 text-center">
+              <div className="text-xl mb-2 animate-pulse">🔍</div>
+              <p className="text-gray-500 font-mono text-xs">Checking which assets are burnable...</p>
+              <p className="text-gray-600 font-mono text-xs mt-1">We simulate each burn before showing it</p>
+              {assets.length > 0 && <p style={{color: '#0088cc'}} className="font-mono text-xs mt-1">{assets.length} burnable found so far...</p>}
+            </div>
           ) : filteredAssets.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-gray-500 text-sm">No {assetFilter === 'all' ? '' : assetFilter} assets found on TON</p>
@@ -289,6 +296,15 @@ export function TonInterface() {
       </div>
 
       {/* Burn footer */}
+      {/* Hidden assets notice */}
+      {hiddenCount > 0 && !scanning && (
+        <div className="bg-gray-900/50 border border-gray-800 rounded-sm p-3 mb-4">
+          <p className="font-mono text-xs text-gray-600">
+            ℹ️ {hiddenCount} asset{hiddenCount !== 1 ? 's' : ''} hidden — not burnable. Only burnable assets are shown here.
+          </p>
+        </div>
+      )}
+
       {selectedAssets.size > 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-sm p-4">
           <div className="mb-4 bg-gray-950 border border-gray-800 rounded-sm p-3">

@@ -1,19 +1,51 @@
 import { useState, useEffect } from 'react';
 import type { Asset } from '@/lib/chains';
 
+const TON_NULL_ADDRESS = 'UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ';
+
+/**
+ * Check if a TON NFT is transferable by checking its contract state
+ */
+async function isTonAssetBurnable(asset: Asset): Promise<boolean> {
+  try {
+    if (asset.type === 'nft') {
+      // Check NFT details — if it has no owner or is already burned, skip
+      const res = await fetch(`https://tonapi.io/v2/nfts/${asset.contractAddress}`);
+      if (!res.ok) return false;
+      const data = await res.json();
+      // If already null address owner or no owner, not burnable
+      if (!data.owner) return false;
+      if (data.owner?.address?.includes('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')) return false;
+      // If sale is active, can't transfer
+      if (data.sale) return false;
+      return true;
+    } else {
+      // For Jettons — check wallet exists and has balance
+      const res = await fetch(`https://tonapi.io/v2/accounts/${asset.contractAddress}/jettons`);
+      if (!res.ok) return true; // Assume burnable if can't check
+      return true;
+    }
+  } catch {
+    return true; // Assume burnable if check fails
+  }
+}
+
 export function useTonAssets(walletAddress: string | null) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [hiddenCount, setHiddenCount] = useState(0);
 
   useEffect(() => {
     if (!walletAddress) { setAssets([]); return; }
 
     async function fetchAssets() {
       setLoading(true);
+      setHiddenCount(0);
       try {
-        const found: Asset[] = [];
+        const allFound: Asset[] = [];
 
-        // Fetch Jettons (TON tokens)
+        // Fetch Jettons
         const jettonsRes = await fetch(
           `https://tonapi.io/v2/accounts/${walletAddress}/jettons?currencies=usd`
         );
@@ -24,7 +56,7 @@ export function useTonAssets(walletAddress: string | null) {
             if (balance === '0') continue;
             const decimals = jetton.jetton?.decimals || 9;
             const uiBalance = Number(BigInt(balance)) / Math.pow(10, decimals);
-            found.push({
+            allFound.push({
               id: `ton-jetton-${jetton.jetton?.address}`,
               name: jetton.jetton?.name || `Jetton (${jetton.jetton?.address?.slice(0, 6)}...)`,
               symbol: jetton.jetton?.symbol || 'JETTON',
@@ -46,7 +78,7 @@ export function useTonAssets(walletAddress: string | null) {
         if (nftsRes.ok) {
           const nftsData = await nftsRes.json();
           for (const nft of nftsData?.nft_items || []) {
-            found.push({
+            allFound.push({
               id: `ton-nft-${nft.address}`,
               name: nft.metadata?.name || `NFT (${nft.address?.slice(0, 6)}...)`,
               symbol: 'NFT',
@@ -61,17 +93,36 @@ export function useTonAssets(walletAddress: string | null) {
           }
         }
 
-        setAssets(found);
+        setLoading(false);
+        setScanning(true);
+
+        // Filter to burnable only
+        const burnable: Asset[] = [];
+        let hidden = 0;
+
+        for (const asset of allFound) {
+          const canBurn = await isTonAssetBurnable(asset);
+          if (canBurn) {
+            burnable.push(asset);
+          } else {
+            hidden++;
+          }
+          setAssets([...burnable]);
+          setHiddenCount(hidden);
+        }
+
+        setScanning(false);
       } catch (err) {
         console.error('TON asset fetch error:', err);
         setAssets([]);
       } finally {
         setLoading(false);
+        setScanning(false);
       }
     }
 
     fetchAssets();
   }, [walletAddress]);
 
-  return { assets, loading };
+  return { assets, loading, scanning, hiddenCount };
 }

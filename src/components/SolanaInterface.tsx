@@ -14,7 +14,7 @@ import { SUPPORTED_CHAINS } from '@/lib/chains';
 
 export function SolanaInterface() {
   const { publicKey, signTransaction, connected } = useWallet();
-  const { assets: rawAssets, loading } = useSolanaAssets(publicKey);
+  const { assets: rawAssets, loading, scanning, hiddenCount } = useSolanaAssets(publicKey);
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [showModal, setShowModal] = useState(false);
   const [burnResults, setBurnResults] = useState<any[] | null>(null);
@@ -177,6 +177,13 @@ export function SolanaInterface() {
             <div className="p-8 text-center">
               <div className="text-2xl mb-3 animate-pulse">◎</div>
               <p className="text-gray-500 font-mono text-sm">Scanning Solana wallet...</p>
+            </div>
+          ) : scanning ? (
+            <div className="p-4 text-center">
+              <div className="text-xl mb-2 animate-pulse">🔍</div>
+              <p className="text-gray-500 font-mono text-xs">Checking which assets are burnable...</p>
+              <p className="text-gray-600 font-mono text-xs mt-1">We simulate each burn before showing it</p>
+              {assets.length > 0 && <p className="text-purple-400 font-mono text-xs mt-1">{assets.length} burnable found so far...</p>}
             </div>
           ) : assets.length === 0 ? (
             <div className="p-8 text-center">
