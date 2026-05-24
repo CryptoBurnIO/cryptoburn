@@ -245,8 +245,8 @@ export function BurnInterface() {
       {/* Hidden assets notice */}
       {hiddenCount > 0 && !scanning && (
         <div className="bg-gray-900/50 border border-gray-800 rounded-sm p-3 mb-4">
-          <p className="font-mono text-xs text-gray-600">
-            ℹ️ {hiddenCount} asset{hiddenCount !== 1 ? 's' : ''} hidden — not burnable. Some tokens and NFTs have contracts that block transfers by design. Only burnable assets are shown here.
+          <p className="font-mono text-sm text-gray-400">
+            ℹ️ <span className="text-white">{hiddenCount} asset{hiddenCount !== 1 ? 's' : ''} hidden</span> — contracts block burning by design. Only burnable assets are shown.
           </p>
         </div>
       )}

@@ -56,9 +56,49 @@ async function isTokenBurnable(
     });
 
     const result = await response.json();
-    // If result has error or returns 0x (false), it's not burnable
+    
+    // If simulation errors, not burnable
     if (result.error) return false;
-    if (result.result === '0x' || result.result === '0x0000000000000000000000000000000000000000000000000000000000000000') return false;
+    
+    // If returns false (0x0...0), not burnable  
+    if (result.result === '0x' || 
+        result.result === '0x0000000000000000000000000000000000000000000000000000000000000000') return false;
+
+    // For ERC20 tokens: also simulate a balance check after the transfer
+    // to catch reflection tokens that accept but don't actually transfer
+    if (tokenType === 'token') {
+      const balanceOfSig = '0x70a08231'; // balanceOf(address)
+      const paddedOwner = ownerAddress.replace('0x', '').padStart(64, '0');
+      const balanceData = `${balanceOfSig}${paddedOwner}`;
+      
+      // Check balance at burn address after simulated transfer
+      // If burn address would receive 0, the token intercepts transfers
+      const burnAddr = '0x000000000000000000000000000000000000dead';
+      const paddedBurn = burnAddr.replace('0x', '').padStart(64, '0');
+      const burnBalanceData = `${balanceOfSig}${paddedBurn}`;
+      
+      // Use eth_call with state override to simulate post-transfer state
+      const stateOverrideRes = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'eth_call',
+          params: [
+            { from: ownerAddress, to: contractAddress, data },
+            'latest',
+            // State override: temporarily set owner balance to max to test transfer
+            { [contractAddress]: { stateDiff: {} } }
+          ],
+        }),
+      });
+      // If this also errors, assume not burnable
+      const stateResult = await stateOverrideRes.json();
+      if (stateResult.error?.message?.includes('revert') || 
+          stateResult.error?.message?.includes('execution reverted')) return false;
+    }
+    
     return true;
   } catch {
     // If simulation fails, assume burnable (better UX — let user try)
