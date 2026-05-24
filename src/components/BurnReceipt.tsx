@@ -19,7 +19,9 @@ function isUserCancelled(error?: string): boolean {
     lower.includes('user rejected') ||
     lower.includes('user denied') ||
     lower.includes('rejected the request') ||
-    lower.includes('cancelled')
+    lower.includes('cancelled') ||
+    lower.includes('did not confirm in time') ||
+    lower.includes('transaction cancelled')
   );
 }
 

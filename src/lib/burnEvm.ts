@@ -1,5 +1,5 @@
 // lib/burnEvm.ts
-import { parseAbi, parseEther, type Address, type WalletClient, type PublicClient } from 'viem';
+import { parseAbi, parseEther, type Address, type WalletClient, type PublicClient, erc20Abi } from 'viem';
 import { EVM_BURN_ADDRESS } from './chains';
 import { FEE_RECIPIENT } from './fees';
 import type { Asset } from './chains';
@@ -100,11 +100,26 @@ export async function burnERC20Token(
       return { success: false, error: 'Transaction failed on chain — token may not be burnable' };
     }
 
+    // Verify balance is now zero — catches reflection tokens that intercept transfers
+    try {
+      const newBalance = await publicClient.readContract({
+        address: asset.contractAddress as Address,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [account],
+      });
+      if (newBalance > BigInt(0)) {
+        return { success: false, error: 'Token contract intercepted the transfer — this token cannot be burned (reflection/fee-on-transfer contract)' };
+      }
+    } catch {
+      // If balance check fails, trust the receipt
+    }
+
     return { success: true, txHash, explorerUrl: `${explorerBase}/tx/${txHash}` };
   } catch (err: unknown) {
     const error = err as Error;
     if (isUserRejection(error.message || '')) return { success: false, error: 'User rejected the request.' };
-    if (error.message?.includes('timed out') || error.message?.includes('timeout')) return { success: false, error: 'Transaction timed out — it may have been cancelled or failed.' };
+    if (error.message?.includes('timed out') || error.message?.includes('timeout') || error.message?.includes('Timed out')) return { success: false, error: 'Transaction cancelled or did not confirm in time.' };
     return { success: false, error: error.message || 'Transaction failed' };
   }
 }
@@ -136,11 +151,27 @@ export async function burnERC721NFT(
       return { success: false, error: 'Transaction failed on chain — NFT may not be burnable' };
     }
 
+    // Verify NFT ownership changed — confirm it's no longer owned by user
+    try {
+      const ERC721_OWNER_ABI = parseAbi(['function ownerOf(uint256 tokenId) view returns (address)']);
+      const newOwner = await publicClient.readContract({
+        address: asset.contractAddress as Address,
+        abi: ERC721_OWNER_ABI,
+        functionName: 'ownerOf',
+        args: [BigInt(asset.tokenId || '0')],
+      }) as Address;
+      if (newOwner.toLowerCase() === account.toLowerCase()) {
+        return { success: false, error: 'NFT contract intercepted the transfer — this NFT cannot be burned' };
+      }
+    } catch {
+      // ownerOf throws if token is burned (no longer exists) — that means it worked!
+    }
+
     return { success: true, txHash, explorerUrl: `${explorerBase}/tx/${txHash}` };
   } catch (err: unknown) {
     const error = err as Error;
     if (isUserRejection(error.message || '')) return { success: false, error: 'User rejected the request.' };
-    if (error.message?.includes('timed out') || error.message?.includes('timeout')) return { success: false, error: 'Transaction timed out — it may have been cancelled or failed.' };
+    if (error.message?.includes('timed out') || error.message?.includes('timeout') || error.message?.includes('Timed out')) return { success: false, error: 'Transaction cancelled or did not confirm in time.' };
     return { success: false, error: error.message || 'Transaction failed' };
   }
 }
@@ -176,7 +207,7 @@ export async function burnERC1155(
   } catch (err: unknown) {
     const error = err as Error;
     if (isUserRejection(error.message || '')) return { success: false, error: 'User rejected the request.' };
-    if (error.message?.includes('timed out') || error.message?.includes('timeout')) return { success: false, error: 'Transaction timed out — it may have been cancelled or failed.' };
+    if (error.message?.includes('timed out') || error.message?.includes('timeout') || error.message?.includes('Timed out')) return { success: false, error: 'Transaction cancelled or did not confirm in time.' };
     return { success: false, error: error.message || 'Transaction failed' };
   }
 }
