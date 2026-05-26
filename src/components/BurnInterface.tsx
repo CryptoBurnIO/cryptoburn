@@ -25,10 +25,12 @@ export function BurnInterface() {
   const [showModal, setShowModal] = useState(false);
   const [burnResults, setBurnResults] = useState<any[] | null>(null);
   const [burnedIds, setBurnedIds] = useState<Set<string>>(new Set());
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [assetFilter, setAssetFilter] = useState<'all' | 'token' | 'nft'>('all');
 
-  const { assets: rawAssets, loading, scanning, hiddenCount } = useEvmAssets(address, chainId);
-  const assets = rawAssets.filter((a) => !burnedIds.has(a.id));
+  const { assets: rawAssets, notBurnableAssets, loading, scanning, hiddenCount } = useEvmAssets(address, chainId);
+  const [showNotBurnable, setShowNotBurnable] = useState(false);
+  const assets = rawAssets.filter((a) => !burnedIds.has(a.id) && !blockedIds.has(a.id));
   const filteredAssets = assets.filter((a) => assetFilter === 'all' || a.type === assetFilter);
   const tokenCount = assets.filter((a) => a.type === 'token').length;
   const nftCount = assets.filter((a) => a.type === 'nft').length;
@@ -94,7 +96,14 @@ export function BurnInterface() {
         .filter((_, i) => results[i]?.success)
         .map((a) => a.id)
     );
+    // Add reflection/intercepted tokens to blocklist so they stop showing
+    const blockedNewIds = new Set(
+      selectedAssetObjects
+        .filter((_, i) => results[i]?.error?.includes('intercepted'))
+        .map((a) => a.id)
+    );
     setBurnedIds((prev) => new Set([...prev, ...successfulIds]));
+    setBlockedIds((prev) => new Set([...prev, ...blockedNewIds]));
     setSelectedAssets(new Set());
   };
 
@@ -172,7 +181,7 @@ export function BurnInterface() {
       </div>
 
       {/* Asset Filter Tabs */}
-      <div className="flex gap-2 mb-3">
+      <div className="flex gap-2 mb-3 flex-wrap">
         {[
           { key: 'all', label: `All (${assets.length})` },
           { key: 'token', label: `Tokens (${tokenCount})` },
@@ -180,9 +189,9 @@ export function BurnInterface() {
         ].map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setAssetFilter(tab.key as 'all' | 'token' | 'nft')}
+            onClick={() => { setAssetFilter(tab.key as 'all' | 'token' | 'nft'); setShowNotBurnable(false); }}
             className={`font-mono text-xs px-3 py-1.5 rounded-sm border transition-all ${
-              assetFilter === tab.key
+              assetFilter === tab.key && !showNotBurnable
                 ? 'bg-orange-950/30 border-orange-500 text-orange-400'
                 : 'text-gray-500 border-gray-700 hover:border-gray-500'
             }`}
@@ -190,7 +199,31 @@ export function BurnInterface() {
             {tab.label}
           </button>
         ))}
+        {notBurnableAssets.length > 0 && (
+          <button
+            onClick={() => setShowNotBurnable(true)}
+            className={`font-mono text-xs px-3 py-1.5 rounded-sm border transition-all ${
+              showNotBurnable
+                ? 'bg-red-950/30 border-red-700 text-red-400'
+                : 'text-gray-600 border-gray-800 hover:border-red-900 hover:text-red-500'
+            }`}
+          >
+            Not Burnable ({notBurnableAssets.length})
+          </button>
+        )}
       </div>
+
+      {/* Not Burnable Warning */}
+      {showNotBurnable && (
+        <div className="bg-red-950/20 border border-red-900/50 rounded-sm p-3 mb-3">
+          <p className="font-mono text-xs text-red-400 mb-1">⚠️ These assets cannot be burned</p>
+          <p className="font-mono text-xs text-gray-500 leading-relaxed">
+            These tokens and NFTs have smart contracts that block transfers or burning by design. 
+            This is a common tactic used by scam and spam tokens. No burn tool can remove them — 
+            they can only be hidden in your wallet interface.
+          </p>
+        </div>
+      )}
 
       {/* Assets List */}
       <div className="bg-gray-900 border border-gray-800 rounded-sm overflow-hidden mb-4 flex flex-col" style={{maxHeight: "420px"}}>
@@ -213,7 +246,20 @@ export function BurnInterface() {
         </div>
 
         <div className="divide-y divide-gray-800/50 overflow-y-auto flex-1">
-          {loading ? (
+          {showNotBurnable ? (
+            notBurnableAssets.map((asset) => (
+              <div key={asset.id} className="flex items-center px-4 py-3 opacity-50 cursor-not-allowed">
+                <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center mr-3 flex-shrink-0">
+                  <span className="text-gray-600 text-xs">✗</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono text-sm text-gray-400 truncate">{asset.name}</p>
+                  <p className="font-mono text-xs text-gray-600">{asset.balance} {asset.symbol}</p>
+                </div>
+                <span className="font-mono text-xs text-red-700 ml-2 flex-shrink-0">NOT BURNABLE</span>
+              </div>
+            ))
+          ) : loading ? (
             <div className="p-8 text-center">
               <div className="text-2xl mb-3 animate-pulse">🔥</div>
               <p className="text-gray-500 font-mono text-sm">Scanning wallet...</p>
@@ -242,14 +288,7 @@ export function BurnInterface() {
         </div>
       </div>
 
-      {/* Hidden assets notice */}
-      {hiddenCount > 0 && !scanning && (
-        <div className="bg-gray-900/50 border border-gray-800 rounded-sm p-3 mb-4">
-          <p className="font-mono text-sm text-gray-400">
-            ℹ️ <span className="text-white">{hiddenCount} asset{hiddenCount !== 1 ? 's' : ''} hidden</span> — contracts block burning by design. Only burnable assets are shown.
-          </p>
-        </div>
-      )}
+
 
       {/* Burn Footer */}
       {selectedAssets.size > 0 && (

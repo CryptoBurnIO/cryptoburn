@@ -140,6 +140,7 @@ const CHAIN_RPC: Record<number, string> = {
 
 export function useEvmAssets(address: string | undefined, chainId: number | undefined) {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [notBurnableAssets, setNotBurnableAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [hiddenCount, setHiddenCount] = useState(0);
@@ -176,7 +177,7 @@ export function useEvmAssets(address: string | undefined, chainId: number | unde
 
         const allAssets: Asset[] = [
           ...((tokenData.result || tokenData.tokens || [])
-            .filter((t: any) => t.token_address || t.contract_address)
+            .filter((t: any) => (t.token_address || t.contract_address) && !t.possible_spam)
             .map((t: any) => ({
               id: `${t.token_address || t.contract_address}-${chainId}`,
               name: t.name || 'Unknown Token',
@@ -190,7 +191,7 @@ export function useEvmAssets(address: string | undefined, chainId: number | unde
               logoUrl: t.logo || t.thumbnail,
               chain: chainKey,
             }))),
-          ...((nftData.result || []).map((n: any) => ({
+          ...((nftData.result || []).filter((n: any) => !n.possible_spam).map((n: any) => ({
             id: `${n.token_address}-${n.token_id}-${chainId}`,
             name: n.name || `NFT #${n.token_id}`,
             symbol: n.symbol || 'NFT',
@@ -211,6 +212,7 @@ export function useEvmAssets(address: string | undefined, chainId: number | unde
         // Simulate each asset to check if burnable
         const rpcUrl = CHAIN_RPC[chainId] || 'https://eth.llamarpc.com';
         const burnable: Asset[] = [];
+        const notBurnable: Asset[] = [];
         let hidden = 0;
 
         for (const asset of allAssets) {
@@ -225,10 +227,11 @@ export function useEvmAssets(address: string | undefined, chainId: number | unde
           if (canBurn) {
             burnable.push(asset);
           } else {
+            notBurnable.push(asset);
             hidden++;
           }
-          // Update progressively as we scan
           setAssets([...burnable]);
+          setNotBurnableAssets([...notBurnable]);
           setHiddenCount(hidden);
         }
 
@@ -246,7 +249,7 @@ export function useEvmAssets(address: string | undefined, chainId: number | unde
     fetchAssets();
   }, [address, chainId]);
 
-  return { assets, loading, scanning, hiddenCount, error };
+  return { assets, notBurnableAssets, loading, scanning, hiddenCount, error };
 }
 
 function getChainKey(chainId: number): ChainKey {
