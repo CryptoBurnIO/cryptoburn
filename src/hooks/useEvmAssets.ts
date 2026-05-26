@@ -50,11 +50,13 @@ async function isTokenBurnable(
         'a9059cbb', // standard transfer - check if it has fee logic after
       ];
       
-      // Check for _rOwned/_tOwned pattern (reflection tokens store two balance maps)
-      // These show as storage slot patterns in bytecode
+      // Reflection tokens are characterised by very large bytecode (>15kb)
+      // and contain specific function signatures for fee distribution
       const hasReflectionPattern = 
-        bytecode.includes('60646') || // common 10% fee pattern
-        bytecode.length > 20000; // reflection contracts are typically very large
+        bytecode.length > 15000 || // reflection contracts are typically very large (>7.5kb hex)
+        bytecode.includes('7f454c46') || // common reflection storage pattern
+        bytecode.includes('52f7c988') || // setTaxFeePercent signature
+        bytecode.includes('2f54bf6e'); // isExcludedFromFee signature
       
       if (hasReflectionPattern) {
         // Do a simulation to verify

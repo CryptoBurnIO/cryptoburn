@@ -179,11 +179,15 @@ export function SolanaInterface() {
               <p className="text-gray-500 font-mono text-sm">Scanning Solana wallet...</p>
             </div>
           ) : scanning ? (
-            <div className="p-4 text-center">
-              <div className="text-xl mb-2 animate-pulse">🔍</div>
-              <p className="text-gray-500 font-mono text-xs">Checking which assets are burnable...</p>
-              <p className="text-gray-600 font-mono text-xs mt-1">We simulate each burn before showing it</p>
-              {assets.length > 0 && <p className="text-purple-400 font-mono text-xs mt-1">{assets.length} burnable found so far...</p>}
+            <div className="p-6 text-center bg-gray-950 border border-purple-900/30 rounded-sm">
+              <div className="text-3xl mb-3 animate-pulse">🔍</div>
+              <p className="text-white font-mono text-sm font-bold mb-1">Checking burnability...</p>
+              <p className="text-gray-400 font-mono text-xs mb-3">Simulating each transfer before showing — this may take 10-20 seconds</p>
+              {assets.length > 0 && (
+                <div className="bg-purple-950/30 border border-purple-800/40 rounded-sm px-3 py-2">
+                  <p className="text-purple-400 font-mono text-sm font-bold">🔥 {assets.length} burnable found so far</p>
+                </div>
+              )}
             </div>
           ) : assets.length === 0 ? (
             <div className="p-8 text-center">
