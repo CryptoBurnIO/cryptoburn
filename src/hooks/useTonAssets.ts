@@ -32,6 +32,7 @@ async function isTonAssetBurnable(asset: Asset): Promise<boolean> {
 
 export function useTonAssets(walletAddress: string | null) {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [notBurnableAssets, setNotBurnableAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [hiddenCount, setHiddenCount] = useState(0);
@@ -98,6 +99,7 @@ export function useTonAssets(walletAddress: string | null) {
 
         // Filter to burnable only
         const burnable: Asset[] = [];
+        const notBurnable: Asset[] = [];
         let hidden = 0;
 
         for (const asset of allFound) {
@@ -105,9 +107,11 @@ export function useTonAssets(walletAddress: string | null) {
           if (canBurn) {
             burnable.push(asset);
           } else {
+            notBurnable.push(asset);
             hidden++;
           }
           setAssets([...burnable]);
+          setNotBurnableAssets([...notBurnable]);
           setHiddenCount(hidden);
         }
 
@@ -124,5 +128,5 @@ export function useTonAssets(walletAddress: string | null) {
     fetchAssets();
   }, [walletAddress]);
 
-  return { assets, loading, scanning, hiddenCount };
+  return { assets, notBurnableAssets, loading, scanning, hiddenCount };
 }

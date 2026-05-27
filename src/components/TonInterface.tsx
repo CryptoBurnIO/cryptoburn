@@ -13,12 +13,13 @@ import type { TonAsset } from '@/lib/burnTon';
 export function TonInterface() {
   const [tonConnectUI] = useTonConnectUI();
   const walletAddress = useTonAddress();
-  const { assets: rawAssets, loading, scanning, hiddenCount } = useTonAssets(walletAddress || null);
+  const { assets: rawAssets, notBurnableAssets, loading, scanning, hiddenCount } = useTonAssets(walletAddress || null);
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [showModal, setShowModal] = useState(false);
   const [burnResults, setBurnResults] = useState<any[] | null>(null);
   const [burnedIds, setBurnedIds] = useState<Set<string>>(new Set());
   const [assetFilter, setAssetFilter] = useState<'all' | 'token' | 'nft'>('all');
+  const [showNotBurnable, setShowNotBurnable] = useState(false);
 
   const assets = rawAssets.filter((a) => !burnedIds.has(a.id));
   const filteredAssets = assets.filter((a) => assetFilter === 'all' || a.type === assetFilter);
@@ -226,7 +227,7 @@ export function TonInterface() {
         ].map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setAssetFilter(tab.key as 'all' | 'token' | 'nft')}
+            onClick={() => { setAssetFilter(tab.key as 'all' | 'token' | 'nft'); setShowNotBurnable(false); }}
             className={`font-mono text-xs px-3 py-1.5 rounded-sm border transition-all ${
               assetFilter === tab.key
                 ? 'text-white border-blue-500'
@@ -237,7 +238,30 @@ export function TonInterface() {
             {tab.label}
           </button>
         ))}
+        {notBurnableAssets.length > 0 && (
+          <button
+            onClick={() => setShowNotBurnable(true)}
+            className={`font-mono text-xs px-3 py-1.5 rounded-sm border transition-all ${
+              showNotBurnable
+                ? 'bg-red-950/30 border-red-700 text-red-400'
+                : 'text-gray-600 border-gray-800 hover:border-red-900 hover:text-red-500'
+            }`}
+          >
+            Not Burnable ({notBurnableAssets.length})
+          </button>
+        )}
       </div>
+
+      {showNotBurnable && (
+        <div className="bg-red-950/20 border border-red-900/50 rounded-sm p-3 mb-3">
+          <p className="font-mono text-xs text-red-400 mb-1">⚠️ These assets cannot be burned</p>
+          <p className="font-mono text-xs text-gray-500 leading-relaxed">
+            These tokens and NFTs have smart contracts that block transfers or burning by design.
+            This is a common tactic used by scam and spam assets. No burn tool can remove them —
+            they can only be hidden in your wallet interface.
+          </p>
+        </div>
+      )}
 
       {/* Assets list */}
       <div className="bg-gray-900 border border-gray-800 rounded-sm overflow-hidden mb-4 flex flex-col" style={{ maxHeight: '420px' }}>
@@ -266,7 +290,20 @@ export function TonInterface() {
         </div>
 
         <div className="divide-y divide-gray-800/50 overflow-y-auto flex-1">
-          {loading ? (
+          {showNotBurnable ? (
+            notBurnableAssets.map((asset) => (
+              <div key={asset.id} className="flex items-center px-4 py-3 opacity-50">
+                <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center mr-3 flex-shrink-0">
+                  <span className="text-gray-600 text-xs">✗</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono text-sm text-gray-400 truncate">{asset.name}</p>
+                  <p className="font-mono text-xs text-gray-600">{asset.balance} {asset.symbol}</p>
+                </div>
+                <span className="font-mono text-xs text-red-700 ml-2 flex-shrink-0">NOT BURNABLE</span>
+              </div>
+            ))
+          ) : loading ? (
             <div className="p-8 text-center">
               <div className="text-2xl mb-3 animate-pulse">💎</div>
               <p className="text-gray-500 font-mono text-sm">Scanning TON wallet...</p>
@@ -300,15 +337,7 @@ export function TonInterface() {
       </div>
 
       {/* Burn footer */}
-      {/* Hidden assets notice */}
-      {hiddenCount > 0 && !scanning && (
-        <div className="bg-gray-900/50 border border-gray-800 rounded-sm p-3 mb-4">
-          <p className="font-mono text-sm text-gray-400">
-            ℹ️ <span className="text-white">{hiddenCount} asset{hiddenCount !== 1 ? 's' : ''} hidden</span> — contracts block burning by design. Only burnable assets are shown.
-          </p>
-        </div>
-      )}
-
+      
       {selectedAssets.size > 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-sm p-4">
           <div className="mb-4 bg-gray-950 border border-gray-800 rounded-sm p-3">
