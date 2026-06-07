@@ -256,7 +256,7 @@ function getChainKey(chainId: number): ChainKey {
     1: 'ethereum', 56: 'bnb', 137: 'polygon', 43114: 'avalanche',
     42161: 'arbitrum', 10: 'optimism', 8453: 'base', 324: 'zksync',
     59144: 'linea', 534352: 'scroll', 1101: 'polygonzkevm', 5000: 'mantle',
-    81457: 'blast', 250: 'fantom', 25: 'cronos', 100: 'gnosis',
+    81457: 'blast', 25: 'cronos', 100: 'gnosis',
     42220: 'celo', 1088: 'metis', 1284: 'moonbeam', 2222: 'kava',
   };
   return map[chainId] || 'ethereum';
