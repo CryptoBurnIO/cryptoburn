@@ -150,17 +150,7 @@ export const SUPPORTED_CHAINS = {
     category: 'L2',
   },
   // ─── TIER 3: Alt L1s & other chains ───
-  fantom: {
-    id: 250,
-    name: 'Fantom',
-    symbol: 'FTM',
-    color: '#1969ff',
-    explorer: 'https://ftmscan.com',
-    rpcUrl: 'https://rpc.ftm.tools',
-    burnAddress: EVM_BURN_ADDRESS,
-    type: 'evm' as const,
-    category: 'L1',
-  },
+
   cronos: {
     id: 25,
     name: 'Cronos',

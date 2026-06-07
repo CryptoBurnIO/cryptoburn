@@ -76,7 +76,7 @@ export default function Home() {
         </h1>
 
         <p className="text-gray-400 max-w-lg text-lg leading-relaxed mb-10">
-          Permanently destroy unwanted tokens and NFTs across 21 chains.
+          Permanently destroy unwanted tokens and NFTs across 22 chains.
           Non-custodial. Open source. Low service fee per burn — tokens from $0.10, NFTs from $0.25.
         </p>
 
@@ -196,7 +196,7 @@ export default function Home() {
             },
             {
               q: 'Which chains are supported?',
-              a: 'CryptoBurn supports 21 EVM chains including Ethereum, BNB Chain, Polygon, Base, Arbitrum, Optimism, Avalanche, zkSync, Linea, Scroll, Fantom, and more. Solana and TON support are coming in Stage 2.',
+              a: 'CryptoBurn supports 22 chains including Ethereum, BNB Chain, Polygon, Base, Arbitrum, Optimism, Avalanche, zkSync, Linea, Scroll, and more EVM chains, plus Solana and TON.',
             },
             {
               q: 'Are burns reversible?',

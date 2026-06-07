@@ -14,7 +14,6 @@ import {
   polygonZkEvm,
   mantle,
   blast,
-  fantom,
   cronos,
   gnosis,
   celo,
@@ -40,7 +39,6 @@ export const ALL_EVM_CHAINS = [
   mantle,
   blast,
   // Tier 3 — Alt L1s
-  fantom,
   cronos,
   gnosis,
   celo,

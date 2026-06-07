@@ -129,7 +129,6 @@ const CHAIN_RPC: Record<number, string> = {
   1101: 'https://zkevm-rpc.com',
   5000: 'https://rpc.mantle.xyz',
   81457: 'https://rpc.blast.io',
-  250: 'https://rpcapi.fantom.network',
   25: 'https://evm.cronos.org',
   100: 'https://rpc.gnosischain.com',
   42220: 'https://forno.celo.org',
